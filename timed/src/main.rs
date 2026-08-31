@@ -29,7 +29,7 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::os::fd::{AsRawFd, RawFd};
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -213,6 +213,17 @@ impl Timed {
             timed::clock::BUILD_EPOCH
         ));
         self.rebuild_sources();
+
+        // Ready means "the socket is listening", not "the clock is right".
+        //
+        // Those are different events and only the first is a startup
+        // condition. Waiting for the second would hold the boot for the
+        // length of an NTS handshake and a poll on every start — and would
+        // never complete at all on a machine with no network, which is
+        // precisely a machine that still needs to finish booting. Whether
+        // the clock is trustworthy is a question for `clock status`, and
+        // will be a readiness level of its own when PEI-500 lands.
+        notify_ready();
 
         loop {
             let now = self.monotonic();
@@ -1188,6 +1199,24 @@ struct Families {
 /// would defeat the whole check.
 fn is_link_local_v6(a: std::net::Ipv6Addr) -> bool {
     (a.segments()[0] & 0xffc0) == 0xfe80
+}
+
+/// Tell peinit the service has started.
+///
+/// The service definition declares `Readiness = Notify`, so peinit holds
+/// the job in `starting` until this arrives and eventually times the start
+/// out. Forgetting it produces a daemon that works perfectly and is
+/// reported as hung, then killed and restarted for ever.
+fn notify_ready() {
+    let Ok(path) = std::env::var("NOTIFY_SOCKET") else { return };
+    match UnixDatagram::unbound() {
+        Ok(s) => {
+            if let Err(e) = s.send_to(b"READY=1", &path) {
+                log::warn(format_args!("readiness notify: {e}"));
+            }
+        }
+        Err(e) => log::warn(format_args!("readiness notify: {e}")),
+    }
 }
 
 fn bind(address: &str) -> Option<UdpSocket> {
