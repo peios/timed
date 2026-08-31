@@ -13,3 +13,4 @@ pub mod select;
 pub mod source;
 pub mod state;
 pub mod trust;
+pub mod worker;

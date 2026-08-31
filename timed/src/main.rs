@@ -43,10 +43,10 @@ use timed::control::{self, ControlObject};
 use timed::discipline::{Adjustment, Discipline, State};
 use timed::filter::FilterOutcome;
 use timed::netd_link::NetdLink;
-use timed::nts_ke;
 use timed::select::{self, Candidate, NoSelection};
 use timed::source::{Rejected, Security, Source, BURST};
 use timed::state;
+use timed::worker::{Done, Job, Worker};
 use timed::{log, resolve};
 
 /// How often the learned frequency is written back, in seconds. Often
@@ -104,6 +104,10 @@ struct Entry {
     rekey_after: f64,
     /// Monotonic time of the next attempt at whatever it needs next.
     retry_after: f64,
+    /// A job is with the worker for this source. Exactly one at a time:
+    /// that bounds the work without needing a pool, and means a slow
+    /// server delays only its own source.
+    in_flight: bool,
     /// Where it stood in the last selection.
     state: SourceState,
 }
@@ -120,6 +124,7 @@ struct Timed {
     listener: UnixListener,
     subscribers: Vec<UnixStream>,
     netd: NetdLink,
+    worker: Worker,
     registry_watch: Option<peios::registry::Key>,
     /// Set by `wait` when the watch descriptor became readable.
     registry_readable: bool,
@@ -178,6 +183,7 @@ impl Timed {
             listener,
             subscribers: Vec::new(),
             netd: NetdLink::new(now),
+            worker: Worker::spawn(),
             registry_watch: config::watch().ok(),
             registry_readable: false,
             dhcp_servers: Vec::new(),
@@ -230,6 +236,7 @@ impl Timed {
             self.netd.maintain(Instant::now());
             self.absorb_netd();
             self.check_registry();
+            self.collect_work();
             self.ensure_roots(now);
             self.maintain_sources(now);
             self.poll_due(now);
@@ -296,6 +303,7 @@ impl Timed {
                 addresses: Vec::new(),
                 rekey_after: 0.0,
                 retry_after: 0.0,
+                in_flight: false,
                 state: SourceState::Unreachable,
             });
         }
@@ -455,142 +463,157 @@ impl Timed {
             return;
         }
         self.roots_after = now + RETRY_INTERVAL;
-        match timed::trust::roots().and_then(nts_ke::tls_config) {
-            Ok(config) => {
-                log::info(format_args!("loaded the machine's root store for NTS-KE"));
-                self.tls = Some(config);
-            }
-            Err(e) => log::warn(format_args!("no root store yet ({e}); retrying")),
-        }
+        self.worker.submit(Job::Roots);
     }
 
     /// Resolve names and run handshakes for anything that needs one.
     fn maintain_sources(&mut self, now: f64) {
         for index in 0..self.entries.len() {
-            if now < self.entries[index].retry_after {
+            if self.entries[index].in_flight || now < self.entries[index].retry_after {
                 continue;
             }
             if self.entries[index].addresses.is_empty() {
-                self.resolve_entry(index, now);
+                let entry = &mut self.entries[index];
+                entry.in_flight = true;
+                let job = Job::Resolve {
+                    index,
+                    host: entry.spec.host.clone(),
+                    port: entry.spec.port.unwrap_or(ntp::nts::DEFAULT_NTP_PORT),
+                };
+                self.worker.submit(job);
                 continue;
             }
             let needs_keys = matches!(self.entries[index].source.security, Security::NtsPending)
                 || (self.entries[index].source.security.is_nts()
                     && now > self.entries[index].rekey_after);
-            if needs_keys {
-                self.handshake_entry(index, now);
+            if !needs_keys {
+                continue;
             }
-        }
-    }
-
-    fn resolve_entry(&mut self, index: usize, now: f64) {
-        let host = self.entries[index].spec.host.clone();
-        match resolve::lookup(&host) {
-            Ok(resolved) => {
-                let port = self.entries[index].spec.port.unwrap_or(ntp::nts::DEFAULT_NTP_PORT);
-                let all = resolve::socket_addrs(&resolved, port);
-                let addresses = self.reachable(all);
-                if addresses.is_empty() {
-                    self.entries[index].source.note =
-                        Some("no address in a family this machine can reach".into());
-                    self.entries[index].retry_after = now + RETRY_INTERVAL;
-                    return;
-                }
-                log::info(format_args!(
-                    "{host} is {} at {}",
-                    resolved.canonical,
-                    addresses[0].ip()
-                ));
-                let entry = &mut self.entries[index];
-                entry.source.address = addresses[0];
-                entry.addresses = addresses;
-                entry.canonical = resolved.canonical;
-                entry.retry_after = 0.0;
-            }
-            Err(e) => {
-                self.entries[index].source.note = Some(format!("cannot resolve: {e}"));
+            let Some(tls) = self.tls.clone() else {
                 self.entries[index].retry_after = now + RETRY_INTERVAL;
-            }
+                continue;
+            };
+            let entry = &mut self.entries[index];
+            // The KE port is not the NTP port the addresses carry.
+            let ke_port = entry.spec.port.unwrap_or(ntp::nts::DEFAULT_KE_PORT);
+            let job = Job::Handshake {
+                index,
+                host: entry.spec.host.clone(),
+                canonical: entry.canonical.clone(),
+                ke_addresses: entry
+                    .addresses
+                    .iter()
+                    .map(|a| SocketAddr::new(a.ip(), ke_port))
+                    .collect(),
+                tls,
+            };
+            entry.in_flight = true;
+            self.worker.submit(job);
         }
     }
 
-    fn handshake_entry(&mut self, index: usize, now: f64) {
-        let Some(tls) = self.tls.clone() else {
-            self.entries[index].retry_after = now + RETRY_INTERVAL;
-            return;
-        };
-        let host = self.entries[index].spec.host.clone();
-        let canonical = self.entries[index].canonical.clone();
-        // The KE port, which is not the NTP port the addresses carry.
-        let ke_port = self.entries[index].spec.port.unwrap_or(ntp::nts::DEFAULT_KE_PORT);
-        let candidates: Vec<SocketAddr> = self.entries[index]
-            .addresses
-            .iter()
-            .map(|a| SocketAddr::new(a.ip(), ke_port))
-            .collect();
-
-        let mut last_error = None;
-        for address in candidates {
-            match nts_ke::handshake(&tls, &canonical, address) {
-                Ok(established) => {
-                    let negotiated = established.negotiated;
-                    // The KE server may name a different NTP server, and
-                    // may name a different port for it.
-                    let ntp_host = negotiated.server.clone().unwrap_or(canonical.clone());
-                    let ntp_addresses = if negotiated.server.is_some() {
-                        match resolve::lookup(&ntp_host) {
-                            Ok(r) => self.reachable(resolve::socket_addrs(&r, negotiated.port)),
-                            Err(e) => {
-                                log::warn(format_args!(
-                                    "{host}: the KE server named {ntp_host}, which does not \
-                                     resolve ({e})"
-                                ));
-                                Vec::new()
-                            }
-                        }
-                    } else {
-                        self.entries[index]
-                            .addresses
-                            .iter()
-                            .map(|a| SocketAddr::new(a.ip(), negotiated.port))
-                            .collect()
-                    };
-                    if ntp_addresses.is_empty() {
-                        last_error = Some("no usable NTP address".to_string());
+    /// Take whatever the worker finished, without ever waiting for it.
+    fn collect_work(&mut self) {
+        let now = self.monotonic();
+        for done in self.worker.collect() {
+            match done {
+                Done::Roots(Ok(config)) => {
+                    log::info(format_args!("loaded the machine's root store for NTS-KE"));
+                    self.tls = Some(config);
+                }
+                Done::Roots(Err(e)) => {
+                    log::warn(format_args!("no root store yet ({e}); retrying"))
+                }
+                Done::Resolved { index, result } => {
+                    if index >= self.entries.len() {
                         continue;
                     }
-
-                    let cookies = negotiated.cookies;
-                    log::info(format_args!(
-                        "{host}: NTS-KE with {canonical} succeeded; {} cookie(s), NTP at {}",
-                        cookies.len(),
-                        ntp_addresses[0]
-                    ));
-                    let _ = state::write_cookies(&host, &cookies);
-                    let entry = &mut self.entries[index];
-                    entry.source.security = Security::Nts { keys: established.keys, cookies };
-                    entry.source.address = ntp_addresses[0];
-                    entry.addresses = ntp_addresses;
-                    entry.rekey_after = now + REKEY_INTERVAL;
-                    entry.retry_after = 0.0;
-                    entry.source.note = None;
-                    entry.source.next_poll = now;
-                    return;
+                    self.entries[index].in_flight = false;
+                    match result {
+                        Ok(resolved) => {
+                            let port =
+                                self.entries[index].spec.port.unwrap_or(ntp::nts::DEFAULT_NTP_PORT);
+                            let addresses =
+                                self.reachable(resolve::socket_addrs(&resolved, port));
+                            if addresses.is_empty() {
+                                self.entries[index].source.note = Some(
+                                    "no address in a family this machine can reach".into(),
+                                );
+                                self.entries[index].retry_after = now + RETRY_INTERVAL;
+                                continue;
+                            }
+                            log::info(format_args!(
+                                "{} is {} at {}",
+                                self.entries[index].spec.host,
+                                resolved.canonical,
+                                addresses[0].ip()
+                            ));
+                            let entry = &mut self.entries[index];
+                            entry.source.address = addresses[0];
+                            entry.addresses = addresses;
+                            entry.canonical = resolved.canonical;
+                            entry.retry_after = 0.0;
+                        }
+                        Err(e) => {
+                            self.entries[index].source.note = Some(format!("cannot resolve: {e}"));
+                            self.entries[index].retry_after = now + RETRY_INTERVAL;
+                        }
+                    }
                 }
-                Err(e) => last_error = Some(e.to_string()),
+                Done::Handshook { index, result } => {
+                    if index >= self.entries.len() {
+                        continue;
+                    }
+                    self.entries[index].in_flight = false;
+                    match result {
+                        Ok((established, addresses)) => {
+                            let addresses = self.reachable(addresses);
+                            if addresses.is_empty() {
+                                self.entries[index].retry_after = now + RETRY_INTERVAL;
+                                continue;
+                            }
+                            let cookies = established.negotiated.cookies.clone();
+                            log::info(format_args!(
+                                "{}: NTS-KE with {} succeeded; {} cookie(s), NTP at {}",
+                                self.entries[index].spec.host,
+                                self.entries[index].canonical,
+                                cookies.len(),
+                                addresses[0]
+                            ));
+                            let _ = state::write_cookies(&self.entries[index].spec.host, &cookies);
+                            let entry = &mut self.entries[index];
+                            entry.source.security =
+                                Security::Nts { keys: established.keys.clone(), cookies };
+                            entry.source.address = addresses[0];
+                            entry.addresses = addresses;
+                            entry.rekey_after = now + REKEY_INTERVAL;
+                            entry.retry_after = 0.0;
+                            entry.source.note = None;
+                            entry.source.next_poll = now;
+                        }
+                        Err(why) => {
+                            // A source that already has keys and merely
+                            // failed to renew keeps working on the cookies
+                            // it holds: a rekey is housekeeping, and
+                            // failing it should not cost a source.
+                            if matches!(
+                                self.entries[index].source.security,
+                                Security::NtsPending
+                            ) {
+                                log::warn(format_args!(
+                                    "{}: NTS-KE failed ({why})",
+                                    self.entries[index].spec.host
+                                ));
+                                self.entries[index].source.note =
+                                    Some(format!("NTS-KE failed: {why}"));
+                            }
+                            self.entries[index].retry_after = now + RETRY_INTERVAL;
+                            self.entries[index].rekey_after = now + RETRY_INTERVAL;
+                        }
+                    }
+                }
             }
         }
-
-        let why = last_error.unwrap_or_else(|| "no address".into());
-        // A source that already has keys and merely failed to renew keeps
-        // working on the cookies it holds — a rekey is housekeeping, and
-        // failing it should not cost the machine a source.
-        if matches!(self.entries[index].source.security, Security::NtsPending) {
-            log::warn(format_args!("{host}: NTS-KE failed ({why})"));
-            self.entries[index].source.note = Some(format!("NTS-KE failed: {why}"));
-        }
-        self.entries[index].retry_after = now + RETRY_INTERVAL;
-        self.entries[index].rekey_after = now + RETRY_INTERVAL;
     }
 
     // -----------------------------------------------------------------
@@ -1150,7 +1173,14 @@ impl Timed {
         // A floor, so a source whose deadline has passed cannot spin the
         // loop; and a ceiling, so the drift file is still written on a
         // machine with no sources at all.
-        Duration::from_secs_f64((soonest - now).clamp(0.05, 60.0))
+        //
+        // While the worker has a job out there is no descriptor to poll on
+        // — a channel is not pollable — so the loop wakes in short hops
+        // instead. A handshake takes seconds, so a quarter of a second
+        // costs nothing and means the answer is acted on when it arrives
+        // rather than up to a minute later.
+        let ceiling = if self.worker.busy() { 0.25 } else { 60.0 };
+        Duration::from_secs_f64((soonest - now).clamp(0.05, ceiling))
     }
 
     fn wait(&mut self, timeout: Duration) {
