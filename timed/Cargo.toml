@@ -1,0 +1,19 @@
+[package]
+name = "timed"
+description = "The Peios time client: the one process permitted to set the clock."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "timed"
+path = "src/lib.rs"
+
+[[bin]]
+name = "timed"
+path = "src/main.rs"
+
+[dependencies]
+ntp = { path = "../ntp" }
+libc = { workspace = true }
