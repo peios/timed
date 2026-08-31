@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "SeSystemtimePrivilege for timed, and for nothing else.",
+    "",
+    "authd unions the privileges of every SID on a token, and a service",
+    "token carries the S-1-5-80 service SID derived from the service name.",
+    "So a record named for that SID grants the privilege to this one",
+    "service -- not to LocalService, which trustd and resolvd also are.",
+    "",
+    "The SID below is SHA-1 of 'TIMED' as upper-cased UTF-16LE, read as five",
+    "little-endian u32s, which is the derivation authd and peinit both",
+    "implement (authd/src/service_sid.rs). It is written out rather than",
+    "computed because a .reg file cannot compute; if the service is ever",
+    "renamed this value must be recomputed, and timed will lose the",
+    "privilege silently if it is not -- the symptom is adjtimex failing",
+    "with EPERM and the clock never being steered.",
+    "",
+    "This is separate from timed-service.reg on purpose. A privilege grant",
+    "is a different kind of statement from a service definition, an image",
+    "may reasonably want to review or withhold it, and an administrator",
+    "looking for 'what on this machine may set the clock' should find one",
+    "file that answers it.",
+    "",
+    "Shipped by the timed package into /usr/share/regim/; inert until an",
+    "image names it in [registry] autoapply."
+  ],
+  "keys": [
+    { "path": "Machine\\Generic" },
+    { "path": "Machine\\Generic\\Authn" },
+    { "path": "Machine\\Generic\\Authn\\Policy" },
+    {
+      "path": "Machine\\Generic\\Authn\\Policy\\S-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161",
+      "values": [
+        {
+          "name": "Privileges",
+          "type": "multi",
+          "data": ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege"]
+        }
+      ]
+    }
+  ]
+}

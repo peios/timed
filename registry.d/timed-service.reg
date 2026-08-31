@@ -1,0 +1,103 @@
+{
+  "_comment": [
+    "The timed service definition and the machine's time policy keys.",
+    "",
+    "Identity is LocalService plus one privilege. timed is the only process",
+    "on the machine permitted to set the clock, and SeSystemtimePrivilege is",
+    "the whole of what it needs -- KACS maps it to CAP_SYS_TIME, which is",
+    "what adjtimex(2) checks. It is granted to timed's *service SID* in",
+    "timed-policy.reg rather than to LocalService, so trustd, resolvd and",
+    "every other LocalService daemon are unaffected.",
+    "",
+    "RequiredPrivileges names two, and the second is not decoration:",
+    "peinit REMOVES every privilege outside this list, and without",
+    "SeChangeNotifyPrivilege a process cannot traverse a directory to reach",
+    "a file. Naming only SeSystemtimePrivilege would produce a daemon that",
+    "can set the clock and cannot open its own drift file.",
+    "",
+    "ExecStartPre runs prepare-state as SYSTEM (HookIdentity) to create",
+    "/var/state/timed and hand it to timed's service SID. peinit provisions",
+    "/run/<service> and nothing else, so a least-privileged service has no",
+    "way to make itself a directory under /var/state. The alternative --",
+    "running timed as SYSTEM -- would give a daemon that parses hostile",
+    "network input the run of the machine. (PEI-572 would replace the hook",
+    "with a StateDirectories field; the hook is what exists today.)",
+    "",
+    "Requires trustd and resolvd. NTS-KE is a TLS connection, so timed needs",
+    "the machine's root store and a resolver before it can authenticate a",
+    "single source. Neither is fatal if late -- timed retries -- but",
+    "declaring the edge means the usual case does not spend fifteen seconds",
+    "in a retry loop on every boot.",
+    "",
+    "Readiness is Notify (0): timed notifies once its socket is listening,",
+    "not once the clock is right. Those are different events and only the",
+    "first is a startup condition -- a service that waited for the second",
+    "would hang for the length of a poll on every boot. 'The clock is",
+    "trustworthy' is a question for `clock status`, and will be a readiness",
+    "level of its own when PEI-500 lands.",
+    "",
+    "RestartPolicy is Always (2). A machine whose clock is drifting free is",
+    "one whose certificates, Kerberos tickets and logs are all quietly",
+    "going wrong.",
+    "",
+    "The Time key is created here with its defaults explicit, so that the",
+    "two that matter are visible to anyone reading the registry rather than",
+    "being invisible compiled-in behaviour:",
+    "  AllowUnauthenticated = 0  NTS required; a network that blocks 4460",
+    "                            gets an unsynchronised machine, which is",
+    "                            honest, rather than one synchronised to",
+    "                            whoever answered on port 123.",
+    "  UseFromDHCP = 0           DHCP option 42 ignored, as on Windows. On a",
+    "                            network you do not control, the DHCP",
+    "                            server's idea of the time is the",
+    "                            attacker's idea of the time.",
+    "",
+    "Servers is deliberately absent. Empty means the compiled fallback set",
+    "behind 0..3.time.peios.org -- three independent operators in three",
+    "jurisdictions, which is the minimum at which one liar is outvoted.",
+    "",
+    "Shipped by the timed package into /usr/share/regim/; inert until an",
+    "image names it in [registry] autoapply."
+  ],
+  "keys": [
+    { "path": "Machine\\System" },
+    { "path": "Machine\\System\\Services" },
+    {
+      "path": "Machine\\System\\Services\\timed",
+      "values": [
+        { "name": "ImagePath", "type": "sz", "data": "/usr/sbin/timed" },
+        { "name": "Triggers", "type": "multi", "data": ["boot"] },
+        { "name": "Identity", "type": "sz", "data": "LocalService" },
+        {
+          "name": "RequiredPrivileges",
+          "type": "multi",
+          "data": ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege"]
+        },
+        {
+          "name": "ExecStartPre",
+          "type": "multi",
+          "data": ["/usr/libexec/timed/prepare-state"]
+        },
+        { "name": "HookIdentity", "type": "sz", "data": "SYSTEM" },
+        { "name": "Requires", "type": "multi", "data": ["trustd", "resolvd"] },
+        { "name": "Readiness", "type": "dword", "data": 0 },
+        { "name": "RuntimeDirectories", "type": "multi", "data": ["timed"] },
+        { "name": "RestartPolicy", "type": "dword", "data": 2 },
+        { "name": "ErrorControl", "type": "dword", "data": 0 },
+        { "name": "DisplayName", "type": "sz", "data": "Time client" },
+        {
+          "name": "Description",
+          "type": "sz",
+          "data": "Keeps the system clock synchronised with authenticated network time sources"
+        }
+      ]
+    },
+    {
+      "path": "Machine\\System\\Time",
+      "values": [
+        { "name": "AllowUnauthenticated", "type": "dword", "data": 0 },
+        { "name": "UseFromDHCP", "type": "dword", "data": 0 }
+      ]
+    }
+  ]
+}
