@@ -1,0 +1,15 @@
+[package]
+name = "clock"
+description = "Operator command for the Peios time client."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "clock"
+path = "src/main.rs"
+
+[dependencies]
+libtimed = { path = "../libtimed" }
+libc = { workspace = true }

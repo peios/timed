@@ -1,7 +1,15 @@
 pub mod clock;
+pub mod config;
+pub mod control;
 pub mod discipline;
 pub mod filter;
+pub mod log;
+pub mod netd_link;
+pub mod nts_ke;
 pub mod random;
+pub mod resolve;
 pub mod sample;
 pub mod select;
 pub mod source;
+pub mod state;
+pub mod trust;
