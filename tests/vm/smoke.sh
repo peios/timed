@@ -13,13 +13,10 @@
 # No grep, sed or awk: the image ships peiosutils, a coreutils fork, and
 # has none of them.
 {
-  # PEI-577: peinit drops into recovery when atriumd reaches Backoff,
-  # which happens 20-30 seconds into a script this long, ending the
-  # session before an NTS handshake and a poll can complete. Nothing to do
-  # with timed — a script that only sleeps reproduces the same state — and
-  # `svctl stop atriumd` does not avoid it, because RestartPolicy brings
-  # it back. Everything up to the wait loop completes; everything after it
-  # currently does not.
+  # Run with loglevel=7 if you want timed's own lines too — except that
+  # they will not appear, because /dev/kmsg is SYSTEM-only and timed is
+  # LocalService (PEI-581). Until that is fixed, the `note` column in
+  # `clock sources` is the in-band diagnostic, which is why it exists.
 
   echo "== the clock as the kernel found it"
   date
