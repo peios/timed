@@ -17,3 +17,15 @@ path = "src/main.rs"
 [dependencies]
 ntp = { path = "../ntp" }
 libc = { workspace = true }
+libtimed = { path = "../libtimed" }
+# Cross-repo path dependencies, as resolvd does for libnetd. Each is the
+# wire crate of a daemon timed talks to: names to resolve, a link state to
+# follow, and the roots an NTS-KE handshake is validated against.
+libresolv = { path = "../../resolvd/libresolv" }
+libnetd = { path = "../../netd/libnetd" }
+libtrust = { path = "../../trustd/libtrust" }
+peios = { workspace = true }
+# The house TLS stack. NTS-KE is TLS 1.3 with an ALPN of "ntske/1" and a
+# key exported from the session; nothing else about it is unusual.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "logging"] }
+rustls-pki-types = "1"

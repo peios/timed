@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["ntp", "libtimed", "timed"]
+members = ["ntp", "libtimed", "timed", "clock"]
 
 # timed is its own workspace root, like netd, resolvd and trustd.
 #
