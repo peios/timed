@@ -287,6 +287,33 @@ mod tests {
     }
 
     #[test]
+    fn a_source_becomes_selectable_only_as_its_filter_fills() {
+        // The property whose absence cost a whole image test. One sample
+        // leaves seven empty slots contributing MAX_DISPERSION, so the
+        // root distance is far past MAX_DISTANCE and the source is not fit
+        // — correctly, since one measurement says very little. It becomes
+        // fit as the register fills.
+        //
+        // What made that a bug was elsewhere: selection ran only when the
+        // filter produced a *new best* sample, so a source whose first
+        // measurement had the lowest delay never had selection re-run, and
+        // stayed unfit for ever while its dispersion quietly fell.
+        let mut filter = ClockFilter::new();
+        filter.insert(sample(0.001, 0.010, 1.0), 1.0);
+        let one = root_distance(&filter.peek(1.0).unwrap(), 0.02, 0.001, 1.0);
+        assert!(one > 1.5, "one sample should be too uncertain, got {one}");
+
+        // Fill it with samples that are all *worse* than the first, which
+        // is the case that produced the bug: none of them displaces the
+        // best, so none reported an update.
+        for t in 2..=8 {
+            filter.insert(sample(0.001, 0.010 + t as f64 * 1e-3, t as f64), t as f64);
+        }
+        let full = root_distance(&filter.peek(8.0).unwrap(), 0.02, 0.001, 8.0);
+        assert!(full < 1.5, "a full filter should be usable, got {full}");
+    }
+
+    #[test]
     fn root_distance_grows_while_a_source_is_silent() {
         let f = Filtered {
             offset: 0.0,

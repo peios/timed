@@ -110,6 +110,11 @@ struct Entry {
     in_flight: bool,
     /// Where it stood in the last selection.
     state: SourceState,
+    /// This source produced a measurement the discipline has not seen.
+    /// Distinct from "we heard from it": a reply that did not beat what
+    /// the filter already held refreshes the dispersion but must not be
+    /// fed to the loop a second time.
+    fresh: bool,
 }
 
 struct Timed {
@@ -305,6 +310,7 @@ impl Timed {
                 retry_after: 0.0,
                 in_flight: false,
                 state: SourceState::Unreachable,
+                fresh: false,
             });
         }
 
@@ -772,7 +778,16 @@ impl Timed {
                 if self.entries[index].source.burst == 0 {
                     self.entries[index].source.schedule(now);
                 }
-                matches!(outcome, FilterOutcome::Update(_))
+                // Any accepted reply is worth re-running selection on, even
+                // when the filter's best sample did not change. A source's
+                // *dispersion* falls as the register fills, and a source
+                // becomes fit by that alone — so gating selection on a
+                // fresh best sample left the first measurement's enormous
+                // dispersion in place for ever and the source permanently
+                // unusable. Whether the discipline is fed is the separate
+                // question `Update` answers.
+                self.entries[index].fresh = matches!(outcome, FilterOutcome::Update(_));
+                true
             }
             Err(Rejected::Kiss(code)) if code == ReferenceId::RATE => {
                 log::warn(format_args!("{host}: asked us to slow down; backing off"));
@@ -896,14 +911,26 @@ impl Timed {
         self.offset = selection.offset;
         self.jitter = selection.jitter;
 
-        self.apply(selection.offset, now, wall);
+        // Only steer on a measurement the loop has not already seen.
+        // Selection itself runs on every reply, because fitness changes as
+        // dispersion falls; feeding the same offset in twice would make
+        // the loop believe it has more information than it does.
+        let fresh = self.entries.iter().any(|e| e.fresh);
+        for entry in self.entries.iter_mut() {
+            entry.fresh = false;
+        }
+        if fresh {
+            self.apply(selection.offset, now, wall);
+        }
 
         for entry in self.entries.iter_mut() {
             entry.source.adapt_poll(selection.offset, selection.jitter.max(1e-9));
         }
 
-        self.updates += 1;
-        self.last_update = Some(now);
+        if fresh {
+            self.updates += 1;
+            self.last_update = Some(now);
+        }
         self.generation += 1;
         self.publish();
     }
