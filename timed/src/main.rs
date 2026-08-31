@@ -133,6 +133,8 @@ struct Timed {
     registry_watch: Option<peios::registry::Key>,
     /// Set by `wait` when the watch descriptor became readable.
     registry_readable: bool,
+    /// The sync state last published to peinit, so it is sent on change.
+    last_level: Option<Sync>,
     /// Time servers the current leases offered.
     dhcp_servers: Vec<String>,
     /// Address families this machine has a usable address in, from netd.
@@ -191,6 +193,7 @@ impl Timed {
             worker: Worker::spawn(),
             registry_watch: config::watch().ok(),
             registry_readable: false,
+            last_level: None,
             dhcp_servers: Vec::new(),
             families: None,
             generation: 0,
@@ -246,6 +249,7 @@ impl Timed {
             self.maintain_sources(now);
             self.poll_due(now);
             self.expire_pending(now);
+            self.publish_level();
             self.persist(now);
 
             let timeout = self.next_deadline(now);
@@ -1110,6 +1114,23 @@ impl Timed {
         }
     }
 
+    /// Tell peinit the clock's state, when it changes.
+    ///
+    /// Called from the loop rather than from `publish`, which only runs on
+    /// a completed poll. A machine that lost every source stops completing
+    /// polls — and that is precisely when its level must fall, so hanging
+    /// this off the success path would leave it reporting `synchronised`
+    /// for ever on a machine whose sources had all gone away.
+    fn publish_level(&mut self) {
+        let level = self.sync_state();
+        if self.last_level == Some(level) {
+            return;
+        }
+        self.last_level = Some(level);
+        log::info(format_args!("clock state is {}", level.as_str()));
+        notify_level(level);
+    }
+
     fn publish(&mut self) {
         if self.subscribers.is_empty() {
             return;
@@ -1258,6 +1279,22 @@ fn is_link_local_v6(a: std::net::Ipv6Addr) -> bool {
     (a.segments()[0] & 0xffc0) == 0xfe80
 }
 
+/// Publish the clock's state to peinit, so that
+/// `Requires = ["timed:synchronised"]` works.
+///
+/// This is what Kerberos will want: a service that cannot function on a
+/// clock nobody has checked should be able to say so, and until now
+/// nothing could wait on it. It travels on the notify socket timed
+/// already has rather than over timed's own control socket, so PID 1
+/// needs no knowledge of libtimed and no subscription to maintain.
+///
+/// Sent on change only. The channel is lossy and unacknowledged by design
+/// (PSPU §4.16), which is fine because a level is a statement of a
+/// current condition rather than an event — the next change re-states it.
+fn notify_level(sync: Sync) {
+    notify(format!("LEVEL={}", sync.as_str()).as_bytes());
+}
+
 /// Tell peinit the service has started.
 ///
 /// The service definition declares `Readiness = Notify`, so peinit holds
@@ -1265,14 +1302,18 @@ fn is_link_local_v6(a: std::net::Ipv6Addr) -> bool {
 /// out. Forgetting it produces a daemon that works perfectly and is
 /// reported as hung, then killed and restarted for ever.
 fn notify_ready() {
+    notify(b"READY=1");
+}
+
+fn notify(payload: &[u8]) {
     let Ok(path) = std::env::var("NOTIFY_SOCKET") else { return };
     match UnixDatagram::unbound() {
         Ok(s) => {
-            if let Err(e) = s.send_to(b"READY=1", &path) {
-                log::warn(format_args!("readiness notify: {e}"));
+            if let Err(e) = s.send_to(payload, &path) {
+                log::warn(format_args!("notify: {e}"));
             }
         }
-        Err(e) => log::warn(format_args!("readiness notify: {e}")),
+        Err(e) => log::warn(format_args!("notify: {e}")),
     }
 }
 
