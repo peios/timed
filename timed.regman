@@ -1,0 +1,194 @@
+--- machine\system\time
+canonical: Machine\System\Time
+
+The machine's time policy: where the clock comes from and what it is
+allowed to believe.
+
+timed reads this subtree, polls the sources it names, and is the only
+process on the machine permitted to set the clock. It holds
+`SeSystemtimePrivilege` and nothing else; the grant is a record on its own
+service SID under `Machine\Generic\Authn\Policy`, so no other service
+running as LocalService acquires it.
+
+Everything here takes effect within a second or two of being written —
+timed watches this subtree — except that a change to `Servers` restarts
+the sources it names, which costs a few minutes of accuracy while they
+converge.
+
+Default security: inherits the Machine hive root (SYSTEM and Administrators
+full, Authenticated Users read). That descriptor is the only gate on
+changing where this machine gets its time. `clock` reads over timed's
+socket and writes nothing, so there is deliberately no second permission
+model: `reg set` is how the policy is changed.
+
+--- machine\system\time servers
+canonical: Machine\System\Time Servers
+type: REG_MULTI_SZ
+default: (absent — the shipped fallback set is used)
+applies: live
+
+The time sources to use, highest precedence. Each entry is a host,
+optionally with a port, optionally followed by option words:
+
+    time.example.org
+    time.example.org:4460
+    dc01.corp.example prefer
+    ntp.lan unauthenticated
+
+- `prefer` — lead with this one when several agree. It breaks ties and
+  nothing more: a preferred source that disagrees with the majority is
+  still discarded, because a preference is a statement about which server
+  to lean on, not a licence to be wrong.
+- `unauthenticated` (or `noauth`) — this source speaks plain NTP rather
+  than NTS. Only honoured when `AllowUnauthenticated` is `1`; otherwise
+  the source is refused and logged, so that turning the machine-wide
+  switch off actually turns everything off rather than leaving per-source
+  exceptions behind.
+
+A misspelled option is an error and the entry is ignored with a warning. A
+silently accepted typo would be a configuration that reads correctly and
+is not.
+
+**Precedence is first-match, not merge.** If this value names anything, it
+is the whole source list; DHCP and the fallback set are not added to it. A
+machine told exactly which servers to use must not also be quietly talking
+to somebody else's.
+
+When this value is absent, timed uses `0.time.peios.org` through
+`3.time.peios.org` — CNAMEs to three independent operators (Cloudflare,
+Netnod, PTB) in three jurisdictions. Three is the minimum at which one
+liar can be outvoted, and independence is what makes the votes worth
+counting: three servers run by one operator would agree with each other
+about anything.
+
+**Use at least three.** With one source there is nothing to check it
+against and it is believed. With two that disagree there is no way to tell
+which is right, and timed reports itself unsynchronised rather than
+guessing.
+
+--- machine\system\time allowunauthenticated
+canonical: Machine\System\Time AllowUnauthenticated
+type: REG_DWORD
+default: 0
+applies: live
+
+Whether a source may be used without NTS.
+
+- `0` (the default) — every source must authenticate. NTS gives each
+  packet an AEAD tag over the whole packet, computed with a key
+  established over an authenticated TLS session, so forging a reply
+  requires the key.
+- `1` — sources marked `unauthenticated` in `Servers` may be used. Their
+  only defence is that the server must echo the exact 64 bits timed put in
+  its request, which timed fills with a random number for this reason. An
+  attacker who cannot see the request cannot forge a reply; one who *can*
+  see it can forge freely.
+
+The default is `0` because the alternative outcome is worse than it looks.
+On a network that blocks port 4460, `0` gives a machine that reports
+itself unsynchronised — which is honest, and which the build-time floor
+keeps usable, because the clock is still recent enough for TLS to work.
+`1` on that network gives a machine synchronised to whoever answered on
+port 123.
+
+Time is what certificate expiry, Kerberos tickets and log ordering all
+rest on, so an attacker who can move it has more than a wrong clock.
+
+--- machine\system\time usefromdhcp
+canonical: Machine\System\Time UseFromDHCP
+type: REG_DWORD
+default: 0
+applies: live
+
+Whether to use the time servers a DHCP lease offers (option 42).
+
+- `0` (the default) — ignored. netd still reports them, and `clock
+  sources` will not list them.
+- `1` — used, when `Servers` is absent. They are polled without NTS, since
+  a DHCP-advertised server is not going to be running NTS-KE.
+
+Off by default, as on Windows, and for the same reason: on a network you
+do not control, the DHCP server's idea of the time is the attacker's idea
+of the time — and setting this to `1` is a statement that you trust every
+network this machine will ever join.
+
+Reasonable to turn on for a machine that only ever attaches to a network
+you run, where the DHCP server and the time server are the same
+appliance.
+
+--- machine\system\time minpoll
+canonical: Machine\System\Time MinPoll
+type: REG_DWORD
+default: 6
+applies: live
+
+The shortest interval between polls of one source, as a power of two
+seconds: `6` is 64 seconds, `10` is about 17 minutes.
+
+Clamped to the range 4 (16 seconds) to 17. The floor is not negotiable: a
+configuration error must not be able to turn this machine into a nuisance
+at somebody else's public server.
+
+Lowering it makes the clock converge faster after a disturbance and costs
+the servers more traffic. There is rarely a reason to: a long interval
+measures *frequency* better than a short one measures phase, and it is the
+frequency estimate that holds the clock right between polls.
+
+--- machine\system\time maxpoll
+canonical: Machine\System\Time MaxPoll
+type: REG_DWORD
+default: 10
+applies: live
+
+The longest interval between polls, as a power of two seconds. timed
+lengthens the interval towards this while the clock is being held steadily
+and shortens it when the offset starts moving.
+
+Clamped to the same range as `MinPoll`, and raised to `MinPoll` if it is
+set below it. Past about 17 minutes a typical crystal drifts further
+between polls than the frequency estimate can predict, so raising it
+trades accuracy for a traffic saving that is already negligible.
+
+--- machine\system\time controlsecurity
+canonical: Machine\System\Time ControlSecurity
+type: REG_BINARY
+default: (absent — the compiled default is used)
+applies: live
+
+A security descriptor for timed's control object, governing what a caller
+may do over `/run/timed/time.sock`.
+
+Two rights: `0x1` query and `0x2` control. The compiled default gives
+SYSTEM and Administrators both, and Everyone query — reading is open
+because what time the machine thinks it is, and how well it knows, is not
+a secret, and a program deciding whether the clock is trustworthy enough
+to validate a certificate should not need a privilege to find out.
+
+Only `reload` needs control. Changing the time policy itself is a registry
+write governed by this key's own descriptor, not by this value.
+
+--- machine\generic\authn\policy timed
+canonical: Machine\Generic\Authn\Policy\S-1-5-80-...  (timed's service SID)
+type: REG_MULTI_SZ
+default: SeSystemtimePrivilege, SeChangeNotifyPrivilege
+applies: next start
+
+Where timed's authority to set the clock actually comes from.
+
+authd unions the privileges of every SID on a token, and a service token
+carries the `S-1-5-80` SID derived from the service name. A record named
+for timed's service SID therefore grants the privilege to timed alone —
+not to LocalService, which trustd and resolvd also run as.
+
+`SeSystemtimePrivilege` is what KACS maps to `CAP_SYS_TIME`, which is what
+`adjtimex(2)` checks. `SeChangeNotifyPrivilege` is not decoration: peinit
+*removes* every privilege outside a service's `RequiredPrivileges` list,
+and without it a process cannot traverse a directory to reach a file — so
+naming only the first would produce a daemon that can set the clock and
+cannot open its own drift file.
+
+Removing this record leaves timed running and measuring, and unable to
+act: `adjtimex` fails with `EPERM` and the clock is never steered. That is
+a legitimate configuration for a machine whose time comes from a
+hypervisor, but `clock status` will report the offset growing, so prefer
+disabling the service.

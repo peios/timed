@@ -1,0 +1,35 @@
+#!/bin/sh
+# Give timed a directory it can own.
+#
+# Run as SYSTEM by ExecStartPre, because timed cannot do this itself:
+# peinit provisions /run/<service> and nothing else, and /var/state is
+# SYSTEM-owned, so a LocalService daemon has no way to make a directory
+# there. Running timed as SYSTEM instead would hand the run of the machine
+# to the one daemon on it that parses hostile network input.
+#
+# Everything here is idempotent: the hook runs on every start, including
+# every restart, and must not care whether it has run before.
+exec > /var/state/timed-prepare.log 2>&1
+set -x
+set -e
+
+TIMED_SID='S-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161'
+STATE=/var/state/timed
+
+mkdir -p "$STATE"
+
+# The whole descriptor at once, with --replace.
+#
+# Not an incremental `sd allow`: a directory whose DACL is *absent* grants
+# implicit full access, and adding a single ACE to it creates a one-ACE
+# DACL that locks out everyone the absent DACL was admitting -- including
+# administrators. That is a real bug this project has already had once,
+# in trustd's equivalent hook. Write the descriptor whole.
+#
+# CI,OI so the cookie files timed creates inherit it rather than needing a
+# second pass. Everyone gets nothing: a machine's NTS cookies are linkable
+# to it, and nothing outside timed has any business reading them.
+sd allow --replace --flags CI,OI "$STATE" \
+  "S-1-5-18:f" "S-1-5-32-544:f" "$TIMED_SID:f"
+
+mkdir -p "$STATE/cookies"

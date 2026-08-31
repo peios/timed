@@ -1,0 +1,7 @@
+# clock — the time client's operator command: status, sources, reload.
+
+[package]
+description = "Operator command for the Peios time client"
+
+[files]
+":usr/bin/clock" = "usr/bin/clock"
