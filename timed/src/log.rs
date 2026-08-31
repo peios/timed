@@ -1,10 +1,17 @@
 //! Lines on stderr, mirrored to the kernel log.
 //!
-//! peinit captures stderr and forwards it to the log collector; on an image
-//! without one those lines vanish. "Why is the clock not synchronised" is
-//! exactly the kind of thing an operator needs from a serial console, so
-//! every line also goes to `/dev/kmsg`, where `dmesg` and the console find
-//! it. Best-effort: a machine where kmsg cannot be opened still runs.
+//! peinit captures stderr and forwards it to eventd, which is where these
+//! lines actually end up and how to read them:
+//!
+//! ```sh
+//! evctl 'LOGS FROM timed SINCE 1h ago TAKE 40'
+//! ```
+//!
+//! Every line is *also* written to `/dev/kmsg`, so that on an image with no
+//! collector it still reaches `dmesg` and the serial console. That mirror
+//! is best-effort and, for timed, always fails: `/dev/kmsg` is writable by
+//! SYSTEM and timed is LocalService (PEI-581). So do not go looking for
+//! these on the console — ask eventd.
 
 use std::fmt::Arguments;
 use std::io::Write;

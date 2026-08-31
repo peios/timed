@@ -57,7 +57,25 @@ pub fn listen() -> io::Result<UnixListener> {
     Ok(listener)
 }
 
-/// Everyone may connect; the object check decides what they may do.
+/// Let everyone reach the socket; the object check decides what they may do.
+///
+/// **The DACL only.** An earlier version also set the owner to SYSTEM, and
+/// that is the one thing a LocalService process cannot do — making somebody
+/// else the owner of an object needs a privilege timed does not have and
+/// should not have. `set_sd` is all-or-nothing, so asking for the owner
+/// failed the whole call with `EPERM` and the DACL was never written
+/// either. The directory then kept peinit's descriptor, which admits
+/// SYSTEM, Administrators and this service and *nobody else*, so an
+/// ordinary program could not traverse it to reach the socket at all —
+/// while the code and the documentation both said reading was open to
+/// everyone.
+///
+/// It failed silently for a long time because the error only ever went to
+/// the log, and a LocalService daemon's log lines do not reach the console
+/// (see PEI-581); `evctl 'LOGS FROM timed'` had them all along.
+///
+/// The owner is left as whoever created the object, which is timed — the
+/// correct answer, and what it already was.
 pub fn protect(path: &Path) {
     use peios::file::SecInfo;
     let system = Sid::well_known(WellKnown::System);
@@ -72,19 +90,15 @@ pub fn protect(path: &Path) {
             AceFlags::empty(),
         )
         .build()
-        .and_then(|dacl| {
-            SdBuilder::new().owner(system.as_ref()).group(system.as_ref()).dacl(&dacl).build()
-        });
+        .and_then(|dacl| SdBuilder::new().dacl(&dacl).build());
     match descriptor {
         Ok(sd) => {
-            if let Err(e) = peios::file::set_sd(
-                None,
-                path,
-                SecInfo::OWNER | SecInfo::GROUP | SecInfo::DACL,
-                &sd,
-                0,
-            ) {
-                log::error(format_args!("could not set a descriptor on {}: {e}", path.display()));
+            if let Err(e) = peios::file::set_sd(None, path, SecInfo::DACL, &sd, 0) {
+                log::error(format_args!(
+                    "could not set a descriptor on {} ({e}); programs other than SYSTEM and \
+                     administrators will not be able to reach the socket",
+                    path.display()
+                ));
             }
         }
         Err(e) => log::warn(format_args!("could not build a descriptor: {e}")),
