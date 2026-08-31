@@ -195,8 +195,8 @@ fn sources() -> u8 {
     // The leading character is the classic NTP display's, because an
     // operator who has used any other time client already knows it.
     println!(
-        "{:<1} {:<24} {:<10} {:<5} {:>4} {:>5} {:>10} {:>9} {:>8}",
-        "", "source", "state", "auth", "str", "reach", "offset", "delay", "last"
+        "{:<1} {:<24} {:<10} {:<5} {:>4} {:>5} {:>10} {:>9} {:>9} {:>7}",
+        "", "source", "state", "auth", "str", "reach", "offset", "delay", "distance", "last"
     );
     for s in &sources {
         let mark = match s.state {
@@ -208,7 +208,7 @@ fn sources() -> u8 {
             SourceState::Unusable => '?',
         };
         println!(
-            "{mark} {:<24} {:<10} {:<5} {:>4} {:>5o} {:>10} {:>9} {:>8}",
+            "{mark} {:<24} {:<10} {:<5} {:>4} {:>5o} {:>10} {:>9} {:>9} {:>7}",
             truncate(&s.name, 24),
             s.state.as_str(),
             s.auth.as_str(),
@@ -216,6 +216,11 @@ fn sources() -> u8 {
             s.reach,
             duration(s.offset),
             duration(s.delay).trim_start_matches('+'),
+            // How wrong this source could be, everything added up. The
+            // number selection actually ranks by — and the one that
+            // answers "why is this source unusable?", which is otherwise
+            // invisible and was worth an hour of guessing.
+            duration(s.root_distance).trim_start_matches('+'),
             age(s.last),
         );
         if let Some(note) = &s.note {

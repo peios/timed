@@ -366,7 +366,14 @@ pub fn interpret(records: &[Record]) -> Result<Negotiated, KeError> {
 /// point, so this is not the primary defence; it is the check that stops a
 /// compromised or careless one from steering us at something that is not a
 /// host at all.
+///
+/// RFC 8915 §4.1.7 allows "an IPv4 address, an IPv6 address, or a fully
+/// qualified domain name", and Netnod's servers answer with a bare address
+/// — so an IPv6 literal, full of colons, has to pass too.
 fn is_plausible_host(name: &str) -> bool {
+    if name.parse::<core::net::IpAddr>().is_ok() {
+        return true;
+    }
     !name.is_empty()
         && name.len() <= 253
         && name.split('.').all(|label| {
@@ -567,6 +574,9 @@ mod tests {
             interpret(&records).is_ok()
         };
         assert!(ok(b"ntp.example.org"));
+        // RFC 8915 permits a bare address, and Netnod sends one.
+        assert!(ok(b"194.58.205.196"));
+        assert!(ok(b"2001:6b0:42::123"));
         assert!(!ok(b""));
         assert!(!ok(b"a..b"));
         assert!(!ok(b"has space"));

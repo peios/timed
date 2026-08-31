@@ -160,12 +160,22 @@ fn handshake(
         // RFC 8915 §4.1.7: the KE server may name a different NTP server,
         // and §4.1.8 a different port.
         let addresses = match &established.negotiated.server {
-            Some(named) => match resolve::lookup(named) {
-                Ok(r) => resolve::socket_addrs(&r, established.negotiated.port),
-                Err(e) => {
-                    last = Some(format!("the KE server named {named}, which does not resolve ({e})"));
-                    continue;
-                }
+            // Netnod's KE server answers with a bare IP address rather than
+            // a name, which RFC 8915 §4.1.7 permits ("an IPv4 address, an
+            // IPv6 address, or a fully qualified domain name"). Sending
+            // that to the resolver asks it to look up a name that is not
+            // one; it answers "found" with no addresses, and the source is
+            // lost for no reason. Parse it first.
+            Some(named) => match named.parse::<std::net::IpAddr>() {
+                Ok(ip) => vec![SocketAddr::new(ip, established.negotiated.port)],
+                Err(_) => match resolve::lookup(named) {
+                    Ok(r) => resolve::socket_addrs(&r, established.negotiated.port),
+                    Err(e) => {
+                        last =
+                            Some(format!("the KE server named {named}, which does not resolve ({e})"));
+                        continue;
+                    }
+                },
             },
             None => ke_addresses
                 .iter()
