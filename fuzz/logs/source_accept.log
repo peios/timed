@@ -34,3 +34,25 @@ INFO: seed corpus: files: 100 min: 48b max: 2148b total: 43800b rss: 33Mb
 #92193	REDUCE cov: 261 ft: 424 corp: 34/9390b lim: 3039 exec/s: 92193 rss: 275Mb L: 2132/2132 MS: 1 EraseBytes-
 #262144	pulse  cov: 261 ft: 424 corp: 34/9390b lim: 4096 exec/s: 87381 rss: 452Mb
 #524288	pulse  cov: 261 ft: 424 corp: 34/9390b lim: 4096 exec/s: 104857 rss: 454Mb
+#1048576	pulse  cov: 261 ft: 424 corp: 34/9390b lim: 4096 exec/s: 95325 rss: 457Mb
+#2097152	pulse  cov: 261 ft: 424 corp: 34/9390b lim: 4096 exec/s: 95325 rss: 457Mb
+#2728066	REDUCE cov: 261 ft: 424 corp: 34/9389b lim: 4096 exec/s: 94071 rss: 457Mb L: 1173/2132 MS: 3 ChangeBit-PersAutoDict-EraseBytes- DE: "\000\000\000\000\000\000\000\000"-
+#4194304	pulse  cov: 261 ft: 424 corp: 34/9389b lim: 4096 exec/s: 95325 rss: 459Mb
+#5579541	REDUCE cov: 261 ft: 424 corp: 34/9388b lim: 4096 exec/s: 96198 rss: 459Mb L: 321/2132 MS: 5 ShuffleBytes-ChangeBinInt-ChangeBit-EraseBytes-InsertByte-
+#8388608	pulse  cov: 261 ft: 424 corp: 34/9388b lim: 4096 exec/s: 96420 rss: 460Mb
+#10239852	REDUCE cov: 261 ft: 424 corp: 34/9368b lim: 4096 exec/s: 94813 rss: 460Mb L: 576/2132 MS: 1 EraseBytes-
+#10299298	REDUCE cov: 261 ft: 424 corp: 34/9366b lim: 4096 exec/s: 94488 rss: 460Mb L: 1075/2132 MS: 1 EraseBytes-
+#11330562	REDUCE cov: 261 ft: 424 corp: 34/9364b lim: 4096 exec/s: 92873 rss: 461Mb L: 1073/2132 MS: 4 ChangeBit-ChangeByte-ChangeByte-EraseBytes-
+#16777216	pulse  cov: 261 ft: 424 corp: 34/9364b lim: 4096 exec/s: 99273 rss: 463Mb
+#24729414	REDUCE cov: 261 ft: 424 corp: 34/9360b lim: 4096 exec/s: 105681 rss: 464Mb L: 1169/2132 MS: 1 EraseBytes-
+#33554432	pulse  cov: 261 ft: 424 corp: 34/9360b lim: 4096 exec/s: 108590 rss: 466Mb
+#45966779	DONE   cov: 261 ft: 424 corp: 34/9360b lim: 4096 exec/s: 109184 rss: 468Mb
+###### Recommended dictionary. ######
+"\000\000\000\000\000\000\000\000" # Uses: 4296678
+###### End of recommended dictionary. ######
+Done 45966779 runs in 421 second(s)
+stat::number_of_executed_units: 45966779
+stat::average_exec_per_sec:     109184
+stat::new_units_added:          16
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              468

@@ -13,6 +13,14 @@
 # No grep, sed or awk: the image ships peiosutils, a coreutils fork, and
 # has none of them.
 {
+  # PEI-577: peinit drops into recovery when atriumd reaches Backoff,
+  # which happens 20-30 seconds into a script this long, ending the
+  # session before an NTS handshake and a poll can complete. Nothing to do
+  # with timed — a script that only sleeps reproduces the same state — and
+  # `svctl stop atriumd` does not avoid it, because RestartPolicy brings
+  # it back. Everything up to the wait loop completes; everything after it
+  # currently does not.
+
   echo "== the clock as the kernel found it"
   date
   echo "(the RTC was set to 2020-01-01; if this reads 2026 then timed has"
