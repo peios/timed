@@ -35,7 +35,7 @@ mod packet;
 mod timestamp;
 
 pub use extension::{ExtensionField, NTS_AUTHENTICATOR, NTS_COOKIE, NTS_COOKIE_PLACEHOLDER, NTS_UNIQUE_IDENTIFIER};
-pub use packet::{LeapIndicator, Mode, Packet, ReferenceId};
+pub use packet::{HEADER_LEN, LeapIndicator, MAX_PACKET, Mode, Packet, ReferenceId, VERSION};
 pub use timestamp::{NtpDuration, NtpShort, NtpTimestamp, UNIX_TO_NTP_ERA0};
 
 /// What went wrong reading something off the wire.
