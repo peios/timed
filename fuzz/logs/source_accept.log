@@ -1,0 +1,36 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on shared package cache
+   Compiling peios-sys v0.3.0 (/home/jack/projects/peios/peios-rs/peios-sys)
+   Compiling peios v0.4.0 (/home/jack/projects/peios/peios-rs/peios)
+   Compiling libnetd v0.1.0 (/home/jack/projects/peios/netd/libnetd)
+   Compiling libtimed v0.1.0 (/home/jack/projects/peios/timed/libtimed)
+   Compiling libtrust v0.1.0 (/home/jack/projects/peios/trustd/libtrust)
+   Compiling timed v0.1.0 (/home/jack/projects/peios/timed/timed)
+   Compiling timed-fuzz v0.0.0 (/home/jack/projects/peios/timed/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5.52s
+    Blocking waiting for file lock on build directory
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.00s
+     Running `fuzz/target/x86_64-unknown-linux-gnu/release/source_accept -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/source_accept/ -max_total_time=420 -print_final_stats=1 /home/jack/projects/peios/timed/fuzz/corpus/source_accept`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3241607888
+INFO: Loaded 1 modules   (4167 inline 8-bit counters): 4167 [0x5ca7fa0c5b70, 0x5ca7fa0c6bb7), 
+INFO: Loaded 1 PC tables (4167 PCs): 4167 [0x5ca7fa0c6bb8,0x5ca7fa0d7028), 
+INFO:      100 files found in /home/jack/projects/peios/timed/fuzz/corpus/source_accept
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 100 min: 48b max: 2148b total: 43800b rss: 33Mb
+#101	INITED cov: 255 ft: 393 corp: 33/9405b exec/s: 0 rss: 37Mb
+	NEW_FUNC[1/1]: 0x5ca7fa015940  (/home/jack/projects/peios/timed/fuzz/target/x86_64-unknown-linux-gnu/release/source_accept+0x16e940) (BuildId: bd9ec663c37a1cb7b357e7c5499eebec26e0726d)
+#129	NEW    cov: 261 ft: 424 corp: 34/9435b lim: 2148 exec/s: 0 rss: 38Mb L: 30/2148 MS: 3 ChangeBinInt-CMP-CrossOver- DE: "\000\000\000\000\000\000\000\000"-
+#597	REDUCE cov: 261 ft: 424 corp: 34/9425b lim: 2148 exec/s: 0 rss: 42Mb L: 20/2148 MS: 3 CrossOver-ChangeBit-EraseBytes-
+#1004	REDUCE cov: 261 ft: 424 corp: 34/9422b lim: 2148 exec/s: 0 rss: 45Mb L: 17/2148 MS: 2 ShuffleBytes-EraseBytes-
+#1285	REDUCE cov: 261 ft: 424 corp: 34/9415b lim: 2148 exec/s: 0 rss: 46Mb L: 10/2148 MS: 1 EraseBytes-
+#1532	REDUCE cov: 261 ft: 424 corp: 34/9413b lim: 2148 exec/s: 0 rss: 46Mb L: 8/2148 MS: 2 ChangeBinInt-EraseBytes-
+#2088	REDUCE cov: 261 ft: 424 corp: 34/9409b lim: 2148 exec/s: 0 rss: 47Mb L: 4/2148 MS: 1 EraseBytes-
+#2181	REDUCE cov: 261 ft: 424 corp: 34/9408b lim: 2148 exec/s: 0 rss: 47Mb L: 3/2148 MS: 3 ChangeBit-ChangeByte-EraseBytes-
+#2392	REDUCE cov: 261 ft: 424 corp: 34/9407b lim: 2148 exec/s: 0 rss: 48Mb L: 2/2148 MS: 1 EraseBytes-
+#3506	REDUCE cov: 261 ft: 424 corp: 34/9406b lim: 2159 exec/s: 0 rss: 50Mb L: 1/2148 MS: 4 ChangeByte-CopyPart-ShuffleBytes-EraseBytes-
+#92193	REDUCE cov: 261 ft: 424 corp: 34/9390b lim: 3039 exec/s: 92193 rss: 275Mb L: 2132/2132 MS: 1 EraseBytes-
+#262144	pulse  cov: 261 ft: 424 corp: 34/9390b lim: 4096 exec/s: 87381 rss: 452Mb
+#524288	pulse  cov: 261 ft: 424 corp: 34/9390b lim: 4096 exec/s: 104857 rss: 454Mb

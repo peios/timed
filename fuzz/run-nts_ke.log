@@ -1,0 +1,20 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling peios-sys v0.3.0 (/home/jack/projects/peios/peios-rs/peios-sys)
+   Compiling peios v0.4.0 (/home/jack/projects/peios/peios-rs/peios)
+   Compiling libnetd v0.1.0 (/home/jack/projects/peios/netd/libnetd)
+   Compiling libtimed v0.1.0 (/home/jack/projects/peios/timed/libtimed)
+   Compiling libtrust v0.1.0 (/home/jack/projects/peios/trustd/libtrust)
+   Compiling timed v0.1.0 (/home/jack/projects/peios/timed/timed)
+   Compiling timed-fuzz v0.0.0 (/home/jack/projects/peios/timed/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.10s
+    Blocking waiting for file lock on build directory
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.84s
+     Running `fuzz/target/x86_64-unknown-linux-gnu/release/nts_ke -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/nts_ke/ -max_total_time=600 -workers=2 -jobs=2 /home/jack/projects/peios/timed/fuzz/corpus/nts_ke`
+fuzz/target/x86_64-unknown-linux-gnu/release/nts_ke -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/nts_ke/ -max_total_time=600 /home/jack/projects/peios/timed/fuzz/corpus/nts_ke >fuzz-1.log 2>&1
+fuzz/target/x86_64-unknown-linux-gnu/release/nts_ke -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/nts_ke/ -max_total_time=600 /home/jack/projects/peios/timed/fuzz/corpus/nts_ke >fuzz-0.log 2>&1
+────────────────────────────────────────────────────────────────────────────────
+
+Error: Fuzz target exited with signal: 15 (SIGTERM)

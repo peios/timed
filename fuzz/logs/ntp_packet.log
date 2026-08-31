@@ -1,0 +1,35 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling timed-fuzz v0.0.0 (/home/jack/projects/peios/timed/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 6.54s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/x86_64-unknown-linux-gnu/release/ntp_packet -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/ntp_packet/ -max_total_time=420 -print_final_stats=1 /home/jack/projects/peios/timed/fuzz/corpus/ntp_packet`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3295517618
+INFO: Loaded 1 modules   (1074 inline 8-bit counters): 1074 [0x56319cd31d90, 0x56319cd321c2), 
+INFO: Loaded 1 PC tables (1074 PCs): 1074 [0x56319cd321c8,0x56319cd364e8), 
+INFO:      127 files found in /home/jack/projects/peios/timed/fuzz/corpus/ntp_packet
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 127 min: 48b max: 3260b total: 73131b rss: 32Mb
+#128	INITED cov: 233 ft: 493 corp: 49/22Kb exec/s: 0 rss: 36Mb
+#136	NEW    cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 37Mb L: 47/3260 MS: 3 ChangeByte-CopyPart-EraseBytes-
+#320	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 38Mb L: 26/3260 MS: 4 InsertByte-ChangeBinInt-ChangeBinInt-EraseBytes-
+#416	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 38Mb L: 21/3260 MS: 1 EraseBytes-
+#431	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 38Mb L: 19/3260 MS: 5 InsertByte-ShuffleBytes-InsertByte-ShuffleBytes-EraseBytes-
+#468	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 39Mb L: 18/3260 MS: 2 InsertByte-EraseBytes-
+#615	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 39Mb L: 16/3260 MS: 2 CopyPart-EraseBytes-
+#961	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 41Mb L: 15/3260 MS: 1 EraseBytes-
+#1029	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 41Mb L: 10/3260 MS: 3 InsertByte-ShuffleBytes-EraseBytes-
+#1825	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3260 exec/s: 0 rss: 44Mb L: 6/3260 MS: 1 EraseBytes-
+#6691	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3304 exec/s: 0 rss: 53Mb L: 3/3260 MS: 1 EraseBytes-
+#6962	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3304 exec/s: 0 rss: 54Mb L: 2/3260 MS: 1 EraseBytes-
+#7138	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 3304 exec/s: 0 rss: 54Mb L: 1/3260 MS: 1 EraseBytes-
+#83665	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 4063 exec/s: 0 rss: 195Mb L: 146/3260 MS: 2 InsertRepeatedBytes-EraseBytes-
+#329979	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 4096 exec/s: 164989 rss: 419Mb L: 179/3260 MS: 4 CopyPart-ShuffleBytes-ChangeByte-EraseBytes-
+#360203	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 4096 exec/s: 180101 rss: 420Mb L: 145/3260 MS: 4 ChangeBit-ChangeByte-ChangeBinInt-EraseBytes-
+#524288	pulse  cov: 235 ft: 496 corp: 50/22Kb lim: 4096 exec/s: 174762 rss: 422Mb
+#601121	REDUCE cov: 235 ft: 496 corp: 50/22Kb lim: 4096 exec/s: 200373 rss: 422Mb L: 177/3260 MS: 2 ShuffleBytes-EraseBytes-
+#1048576	pulse  cov: 235 ft: 496 corp: 50/22Kb lim: 4096 exec/s: 209715 rss: 424Mb

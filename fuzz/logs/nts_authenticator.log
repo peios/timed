@@ -1,0 +1,23 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on shared package cache
+    Blocking waiting for file lock on build directory
+   Compiling timed-fuzz v0.0.0 (/home/jack/projects/peios/timed/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 6.17s
+    Blocking waiting for file lock on build directory
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.37s
+     Running `fuzz/target/x86_64-unknown-linux-gnu/release/nts_authenticator -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/nts_authenticator/ -max_total_time=420 -print_final_stats=1 /home/jack/projects/peios/timed/fuzz/corpus/nts_authenticator`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3267294461
+INFO: Loaded 1 modules   (2384 inline 8-bit counters): 2384 [0x567346514310, 0x567346514c60), 
+INFO: Loaded 1 PC tables (2384 PCs): 2384 [0x567346514c60,0x56734651e160), 
+INFO:       84 files found in /home/jack/projects/peios/timed/fuzz/corpus/nts_authenticator
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 84 min: 2b max: 378b total: 8475b rss: 33Mb
+#85	INITED cov: 222 ft: 393 corp: 36/2880b exec/s: 0 rss: 37Mb
+#507	NEW    cov: 223 ft: 395 corp: 37/2881b lim: 328 exec/s: 0 rss: 40Mb L: 1/328 MS: 2 ShuffleBytes-EraseBytes-
+#203034	REDUCE cov: 223 ft: 395 corp: 37/2874b lim: 2341 exec/s: 203034 rss: 113Mb L: 53/328 MS: 2 ChangeBit-EraseBytes-
+#210536	REDUCE cov: 223 ft: 395 corp: 37/2873b lim: 2407 exec/s: 210536 rss: 116Mb L: 52/328 MS: 2 EraseBytes-InsertByte-
+#524288	pulse  cov: 223 ft: 395 corp: 37/2873b lim: 4096 exec/s: 174762 rss: 229Mb
+#1048576	pulse  cov: 223 ft: 395 corp: 37/2873b lim: 4096 exec/s: 149796 rss: 419Mb
