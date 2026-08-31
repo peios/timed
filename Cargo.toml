@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["ntp"]
+
+# timed is its own workspace root, like netd, resolvd and trustd.
+#
+#   ntp       the wire: NTPv4 packets, NTS extension fields, the NTS-KE
+#             record format. Pure codec — no sockets, no clock, no policy.
+#             Everything hostile arrives through here, so it is the crate
+#             that gets fuzzed hardest.
+#   libtimed  the control wire: paths, rights, request/reply codec, the
+#             shapes `clock` and the future NTP server read.
+#   timed     the daemon. The one process on the machine permitted to set
+#             the clock.
+#   clock     the operator command.
+#
+# There is deliberately no server here. An NTP *server* is a separate,
+# future, unprivileged package that subscribes to timed for its state: the
+# client holds the dangerous privilege but listens on nothing, and the
+# server is exposed to the whole domain but needs no privilege at all.
+# Putting them in one process would give the exposed half the privileged
+# half's rights, which is the arrangement every other Peios daemon pair
+# (netd/resolvd, authd/lpsd) exists to avoid.
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+libc = "0.2"
+peios = { path = "../peios-rs/peios" }

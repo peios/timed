@@ -1,0 +1,15 @@
+[package]
+name = "ntp"
+description = "NTPv4 and NTS wire formats: packets, extension fields, NTS-KE records. Pure codec."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# AES-SIV is the AEAD RFC 8915 mandates (AEAD_AES_SIV_CMAC_256, id 15), and
+# it is inseparable from the authenticator extension field: a packet whose
+# authenticator has not been opened has not been parsed, only read. Keeping
+# the two in one crate is what stops a caller from acting on the second
+# without the first.
+aes-siv = "0.8"
