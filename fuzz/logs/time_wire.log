@@ -1,0 +1,45 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on shared package cache
+    Blocking waiting for file lock on build directory
+   Compiling timed-fuzz v0.0.0 (/home/jack/projects/peios/timed/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5.71s
+    Blocking waiting for file lock on build directory
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.82s
+     Running `fuzz/target/x86_64-unknown-linux-gnu/release/time_wire -artifact_prefix=/home/jack/projects/peios/timed/fuzz/artifacts/time_wire/ -max_total_time=420 -print_final_stats=1 /home/jack/projects/peios/timed/fuzz/corpus/time_wire`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3250643408
+INFO: Loaded 1 modules   (1846 inline 8-bit counters): 1846 [0x6020c6249e10, 0x6020c624a546), 
+INFO: Loaded 1 PC tables (1846 PCs): 1846 [0x6020c624a548,0x6020c62518a8), 
+INFO:      854 files found in /home/jack/projects/peios/timed/fuzz/corpus/time_wire
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 854 min: 1b max: 212b total: 34160b rss: 33Mb
+#855	INITED cov: 627 ft: 1211 corp: 320/9707b exec/s: 0 rss: 53Mb
+#10101	REDUCE cov: 627 ft: 1211 corp: 320/9701b lim: 307 exec/s: 0 rss: 68Mb L: 65/210 MS: 1 EraseBytes-
+#13687	REDUCE cov: 627 ft: 1211 corp: 320/9697b lim: 339 exec/s: 0 rss: 75Mb L: 23/210 MS: 1 EraseBytes-
+#18078	REDUCE cov: 627 ft: 1211 corp: 320/9695b lim: 379 exec/s: 0 rss: 84Mb L: 52/210 MS: 1 EraseBytes-
+#194089	REDUCE cov: 627 ft: 1211 corp: 320/9686b lim: 2125 exec/s: 194089 rss: 227Mb L: 43/210 MS: 1 EraseBytes-
+#199162	REDUCE cov: 627 ft: 1211 corp: 320/9685b lim: 2169 exec/s: 199162 rss: 228Mb L: 22/210 MS: 2 InsertByte-EraseBytes-
+#218794	REDUCE cov: 627 ft: 1211 corp: 320/9682b lim: 2356 exec/s: 218794 rss: 230Mb L: 15/210 MS: 2 EraseBytes-ChangeBit-
+#220270	REDUCE cov: 627 ft: 1211 corp: 320/9681b lim: 2367 exec/s: 220270 rss: 230Mb L: 24/210 MS: 1 EraseBytes-
+#284236	REDUCE cov: 627 ft: 1211 corp: 320/9680b lim: 2994 exec/s: 284236 rss: 233Mb L: 14/210 MS: 1 EraseBytes-
+#434083	REDUCE cov: 627 ft: 1211 corp: 320/9679b lim: 4096 exec/s: 217041 rss: 239Mb L: 31/210 MS: 2 CMP-EraseBytes- DE: "\001\003"-
+#454980	REDUCE cov: 627 ft: 1211 corp: 320/9677b lim: 4096 exec/s: 227490 rss: 240Mb L: 15/210 MS: 2 EraseBytes-PersAutoDict- DE: "\001\003"-
+#500658	REDUCE cov: 627 ft: 1211 corp: 320/9676b lim: 4096 exec/s: 250329 rss: 242Mb L: 21/210 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#524288	pulse  cov: 627 ft: 1211 corp: 320/9676b lim: 4096 exec/s: 262144 rss: 243Mb
+#588005	REDUCE cov: 627 ft: 1211 corp: 320/9675b lim: 4096 exec/s: 196001 rss: 243Mb L: 56/210 MS: 2 ShuffleBytes-EraseBytes-
+#651642	REDUCE cov: 627 ft: 1211 corp: 320/9668b lim: 4096 exec/s: 217214 rss: 243Mb L: 67/210 MS: 1 EraseBytes-
+#685818	REDUCE cov: 627 ft: 1211 corp: 320/9667b lim: 4096 exec/s: 228606 rss: 243Mb L: 14/210 MS: 1 EraseBytes-
+#776804	REDUCE cov: 627 ft: 1211 corp: 320/9666b lim: 4096 exec/s: 194201 rss: 244Mb L: 42/210 MS: 1 EraseBytes-
+#951370	REDUCE cov: 627 ft: 1211 corp: 320/9665b lim: 4096 exec/s: 237842 rss: 248Mb L: 51/210 MS: 1 EraseBytes-
+#1017952	REDUCE cov: 627 ft: 1211 corp: 320/9664b lim: 4096 exec/s: 203590 rss: 248Mb L: 68/210 MS: 2 ChangeBit-EraseBytes-
+#1048576	pulse  cov: 627 ft: 1211 corp: 320/9664b lim: 4096 exec/s: 209715 rss: 248Mb
+#1071173	REDUCE cov: 627 ft: 1211 corp: 320/9662b lim: 4096 exec/s: 214234 rss: 248Mb L: 27/210 MS: 1 EraseBytes-
+#1085089	REDUCE cov: 627 ft: 1211 corp: 320/9658b lim: 4096 exec/s: 217017 rss: 248Mb L: 38/210 MS: 1 EraseBytes-
+#1235335	REDUCE cov: 627 ft: 1211 corp: 320/9657b lim: 4096 exec/s: 205889 rss: 248Mb L: 67/210 MS: 1 EraseBytes-
+#1675742	REDUCE cov: 627 ft: 1211 corp: 320/9656b lim: 4096 exec/s: 209467 rss: 248Mb L: 37/210 MS: 1 EraseBytes-
+#1729203	REDUCE cov: 627 ft: 1211 corp: 320/9655b lim: 4096 exec/s: 216150 rss: 248Mb L: 23/210 MS: 1 EraseBytes-
+#2002039	REDUCE cov: 627 ft: 1211 corp: 320/9653b lim: 4096 exec/s: 200203 rss: 248Mb L: 87/210 MS: 1 EraseBytes-
+#2097152	pulse  cov: 627 ft: 1211 corp: 320/9653b lim: 4096 exec/s: 209715 rss: 248Mb
