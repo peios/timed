@@ -55,8 +55,11 @@
     i=$((i + 1))
     STATE=$(clock status | head -2 | tail -1)
     echo "  [$i] $STATE"
+    # "unsynchronised" contains "synchronised", so a *synchronised* glob
+    # matches the state we are waiting to leave and the loop exits at once.
+    # Match the two states that mean the clock is actually being steered.
     case "$STATE" in
-      *synchronised*|*settling*) break ;;
+      *"state        synchronised"*|*settling*|*spike*) break ;;
     esac
   done
 

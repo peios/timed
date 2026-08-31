@@ -1,0 +1,59 @@
+[package]
+name = "timed-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+arbitrary = { version = "1", features = ["derive"] }
+ntp = { path = "../ntp" }
+libtimed = { path = "../libtimed" }
+timed = { path = "../timed" }
+
+[[bin]]
+name = "ntp_packet"
+path = "fuzz_targets/ntp_packet.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nts_ke"
+path = "fuzz_targets/nts_ke.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nts_authenticator"
+path = "fuzz_targets/nts_authenticator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "time_wire"
+path = "fuzz_targets/time_wire.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "source_accept"
+path = "fuzz_targets/source_accept.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "engine_ops"
+path = "fuzz_targets/engine_ops.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

@@ -125,6 +125,9 @@ struct Timed {
     registry_readable: bool,
     /// Time servers the current leases offered.
     dhcp_servers: Vec<String>,
+    /// Address families this machine has a usable address in, from netd.
+    /// `None` until netd has been heard from, meaning "try anything".
+    families: Option<Families>,
     generation: u64,
     precision: i8,
     /// What the machine currently reports about itself.
@@ -178,6 +181,7 @@ impl Timed {
             registry_watch: config::watch().ok(),
             registry_readable: false,
             dhcp_servers: Vec::new(),
+            families: None,
             generation: 0,
             precision,
             stratum: 16,
@@ -367,6 +371,49 @@ impl Timed {
     fn absorb_netd(&mut self) {
         let snapshots = self.netd.service(Instant::now());
         let Some(latest) = snapshots.into_iter().next_back() else { return };
+
+        // Which families this machine can actually reach. A name commonly
+        // resolves to both an A and an AAAA, and connecting to the AAAA on
+        // a network with no IPv6 fails — quickly, but four sources times
+        // several addresses times a handshake each is minutes of a boot
+        // spent on connections that were never going to work. netd already
+        // tells us what addresses the interfaces carry, so use it.
+        let mut families = Families { v4: false, v6: false };
+        for scope in &latest.scopes {
+            for address in &scope.addresses {
+                let text = address.split('/').next().unwrap_or(address);
+                match text.parse::<IpAddr>() {
+                    Ok(IpAddr::V4(a)) if !a.is_loopback() && !a.is_link_local() => {
+                        families.v4 = true
+                    }
+                    // A link-local IPv6 address is not connectivity: every
+                    // interface has one whether or not anything is
+                    // reachable through it.
+                    Ok(IpAddr::V6(a)) if !a.is_loopback() && !is_link_local_v6(a) => {
+                        families.v6 = true
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let changed = self.families != Some(families);
+        self.families = Some(families);
+        if changed {
+            log::info(format_args!(
+                "usable address families: {}{}{}",
+                if families.v4 { "IPv4 " } else { "" },
+                if families.v6 { "IPv6" } else { "" },
+                if !families.v4 && !families.v6 { "none yet" } else { "" }
+            ));
+            // Addresses already chosen may be in a family that just went
+            // away, or a family that just arrived may be better.
+            let now = self.monotonic();
+            for entry in self.entries.iter_mut() {
+                entry.addresses.clear();
+                entry.retry_after = now;
+            }
+        }
+
         let mut servers: Vec<String> = Vec::new();
         for scope in &latest.scopes {
             for s in &scope.ntp {
@@ -430,8 +477,11 @@ impl Timed {
         match resolve::lookup(&host) {
             Ok(resolved) => {
                 let port = self.entries[index].spec.port.unwrap_or(ntp::nts::DEFAULT_NTP_PORT);
-                let addresses = resolve::socket_addrs(&resolved, port);
+                let all = resolve::socket_addrs(&resolved, port);
+                let addresses = self.reachable(all);
                 if addresses.is_empty() {
+                    self.entries[index].source.note =
+                        Some("no address in a family this machine can reach".into());
                     self.entries[index].retry_after = now + RETRY_INTERVAL;
                     return;
                 }
@@ -478,7 +528,7 @@ impl Timed {
                     let ntp_host = negotiated.server.clone().unwrap_or(canonical.clone());
                     let ntp_addresses = if negotiated.server.is_some() {
                         match resolve::lookup(&ntp_host) {
-                            Ok(r) => resolve::socket_addrs(&r, negotiated.port),
+                            Ok(r) => self.reachable(resolve::socket_addrs(&r, negotiated.port)),
                             Err(e) => {
                                 log::warn(format_args!(
                                     "{host}: the KE server named {ntp_host}, which does not \
@@ -574,8 +624,47 @@ impl Timed {
         if let Err(e) = socket.send_to(&bytes, address) {
             self.entries[index].source.note = Some(format!("cannot send: {e}"));
             self.entries[index].source.pending = None;
+            self.rotate_address(index);
             self.entries[index].source.schedule(now);
         }
+    }
+
+    /// Move to the next address this name resolved to.
+    ///
+    /// A name usually resolves to several, and the first one is not
+    /// necessarily reachable — a host may be behind a route that is down,
+    /// or in an address family that stopped working since it was chosen.
+    /// Without this a source picks one address at startup and is pinned to
+    /// it for the life of the process.
+    fn rotate_address(&mut self, index: usize) {
+        let entry = &mut self.entries[index];
+        if entry.addresses.len() < 2 {
+            return;
+        }
+        let current = entry.source.address;
+        let position = entry.addresses.iter().position(|a| *a == current).unwrap_or(0);
+        let next = entry.addresses[(position + 1) % entry.addresses.len()];
+        entry.source.address = next;
+        log::info(format_args!("{}: trying {next} instead", entry.spec.host));
+    }
+
+    /// Keep only the addresses this machine has any prospect of reaching.
+    ///
+    /// Before netd has been heard from, everything is kept: a wrong guess
+    /// costs one failed connection, and refusing to try anything until the
+    /// network has been described would be worse.
+    fn reachable(&self, addresses: Vec<SocketAddr>) -> Vec<SocketAddr> {
+        let Some(families) = self.families else { return addresses };
+        if !families.v4 && !families.v6 {
+            return addresses;
+        }
+        addresses
+            .into_iter()
+            .filter(|a| match a.ip() {
+                IpAddr::V4(_) => families.v4,
+                IpAddr::V6(_) => families.v6,
+            })
+            .collect()
     }
 
     fn expire_pending(&mut self, now: f64) {
@@ -587,7 +676,10 @@ impl Timed {
             self.entries[index].source.record_loss(now);
             if self.entries[index].source.reach == 0 {
                 log::warn(format_args!("{host}: no reply for eight polls"));
-                // A source that has gone entirely silent may have moved.
+                // A source that has gone entirely silent may have moved,
+                // or the address chosen for it may be the unreachable one
+                // of several the name resolves to.
+                self.rotate_address(index);
                 self.entries[index].addresses.clear();
                 self.entries[index].retry_after = now;
             }
@@ -1081,6 +1173,21 @@ impl Timed {
         }
         let _ = self.started;
     }
+}
+
+/// Which address families the machine has a usable address in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Families {
+    v4: bool,
+    v6: bool,
+}
+
+/// `fe80::/10`. Not in stable std as a method on `Ipv6Addr`, and worth
+/// getting right: every interface has a link-local address whether or not
+/// anything at all is reachable over IPv6, so counting one as connectivity
+/// would defeat the whole check.
+fn is_link_local_v6(a: std::net::Ipv6Addr) -> bool {
+    (a.segments()[0] & 0xffc0) == 0xfe80
 }
 
 fn bind(address: &str) -> Option<UdpSocket> {
