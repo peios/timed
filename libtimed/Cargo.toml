@@ -1,0 +1,10 @@
+[package]
+name = "libtimed"
+description = "timed's control wire: paths, rights, and the request/reply codec."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+peios = { workspace = true }
