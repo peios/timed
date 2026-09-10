@@ -8,11 +8,7 @@ side_effects = ["man-db"]
 name        = "dev.peios.clock"
 description = "Operator command for the Peios time client"
 
-[provides]
-clock = "{{version}}-1"
 
-[replaces]
-clock = "<= 0.1.0-8"
 
 [dependencies]
 "dev.peios.libpeios" = ">= 0.5.0"
