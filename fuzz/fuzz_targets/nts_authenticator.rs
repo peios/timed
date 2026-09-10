@@ -19,7 +19,12 @@ fuzz_target!(|data: &[u8]| {
     // the buffer is exactly the case that must be refused before slicing.
     let split = data[0] as usize % data.len();
     let (whole, value) = data.split_at(split);
-    for at in [0usize, whole.len(), whole.len().saturating_add(1), usize::MAX] {
+    for at in [
+        0usize,
+        whole.len(),
+        whole.len().saturating_add(1),
+        usize::MAX,
+    ] {
         let _ = nts::open_authenticator(&KEY, whole, at, value);
     }
 });

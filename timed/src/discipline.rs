@@ -217,7 +217,10 @@ impl Discipline {
     /// True once the clock is being actively held, which is what
     /// "synchronised" means to everything outside this file.
     pub fn is_synchronised(&self) -> bool {
-        matches!(self.state, State::Synchronised | State::Settling | State::Spike)
+        matches!(
+            self.state,
+            State::Synchronised | State::Settling | State::Spike
+        )
     }
 
     /// Everything measured before now was measured against a different
@@ -253,7 +256,10 @@ impl Discipline {
             self.updates += 1;
             if offset.abs() > STEP_THRESHOLD {
                 self.stepped += offset.abs();
-                return Adjustment::Step { seconds: offset, rate: self.frequency };
+                return Adjustment::Step {
+                    seconds: offset,
+                    rate: self.frequency,
+                };
             }
             return Adjustment::Rate(self.apply_slew(offset));
         }
@@ -277,7 +283,10 @@ impl Discipline {
             self.slew = 0.0;
             self.updates += 1;
             self.stepped += offset.abs();
-            return Adjustment::Step { seconds: offset, rate: self.frequency };
+            return Adjustment::Step {
+                seconds: offset,
+                rate: self.frequency,
+            };
         }
 
         // A normal offset ends any spike in progress: the large readings
@@ -400,7 +409,11 @@ mod tests {
 
     impl SimClock {
         fn new(error_ppm: f64) -> SimClock {
-            SimClock { error: error_ppm * 1e-6, correction: 0.0, offset: 0.0 }
+            SimClock {
+                error: error_ppm * 1e-6,
+                correction: 0.0,
+                offset: 0.0,
+            }
         }
 
         fn advance(&mut self, seconds: f64) {
@@ -437,7 +450,9 @@ mod tests {
         for _ in 0..polls {
             clock.advance(poll);
             now += poll;
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let jitter = ((seed >> 33) as f64 / (1u64 << 31) as f64 - 0.5) * noise;
             let adjustment = d.update(clock.measured_offset() + jitter, now);
             clock.apply(adjustment);
@@ -480,10 +495,12 @@ mod tests {
             now += 64.0;
             let adjustment = d.update(clock.measured_offset(), now);
             clock.apply(adjustment);
-            if i > 4 && clock.offset != 0.0 && previous != 0.0 {
-                if clock.offset.signum() != previous.signum() {
-                    crossings += 1;
-                }
+            if i > 4
+                && clock.offset != 0.0
+                && previous != 0.0
+                && clock.offset.signum() != previous.signum()
+            {
+                crossings += 1;
             }
             previous = clock.offset;
         }
@@ -622,7 +639,11 @@ mod tests {
         // A large-ish offset on top of an already saturated frequency.
         for i in 1..50 {
             if let Adjustment::Rate(r) = d.update(0.12, i as f64 * 64.0) {
-                assert!(r.abs() <= MAX_FREQUENCY + 1e-15, "asked for {} ppm", r * 1e6);
+                assert!(
+                    r.abs() <= MAX_FREQUENCY + 1e-15,
+                    "asked for {} ppm",
+                    r * 1e6
+                );
             }
         }
     }

@@ -18,7 +18,7 @@
 //!   decays geometrically with delay rank, so a filter holding one good
 //!   sample and seven stale ones reports honestly that it is mostly stale.
 
-use crate::sample::{Sample, MIN_DISPERSION, PHI};
+use crate::sample::{MIN_DISPERSION, PHI, Sample};
 
 /// Samples kept per source. Eight is RFC 5905's NSTAGE, and the geometric
 /// weighting below is written for it.
@@ -115,7 +115,9 @@ impl ClockFilter {
         // large dispersion rather than a confident wrong answer.
         let mut dispersion = 0.0;
         for i in 0..NSTAGE {
-            let each = ranked.get(i).map_or(MAX_DISPERSION, |s| s.aged_dispersion(now));
+            let each = ranked
+                .get(i)
+                .map_or(MAX_DISPERSION, |s| s.aged_dispersion(now));
             dispersion += each / (2.0f64).powi(i as i32 + 1);
         }
 
@@ -123,7 +125,10 @@ impl ClockFilter {
         // single sample there is no spread to measure and the precision
         // floor is the honest answer.
         let jitter = if ranked.len() > 1 {
-            let sum: f64 = ranked[1..].iter().map(|s| (s.offset - best.offset).powi(2)).sum();
+            let sum: f64 = ranked[1..]
+                .iter()
+                .map(|s| (s.offset - best.offset).powi(2))
+                .sum();
             (sum / (ranked.len() - 1) as f64).sqrt().max(MIN_DISPERSION)
         } else {
             MIN_DISPERSION
@@ -161,16 +166,27 @@ impl ClockFilter {
         let best = ranked[0];
         let mut dispersion = 0.0;
         for i in 0..NSTAGE {
-            let each = ranked.get(i).map_or(MAX_DISPERSION, |s| s.aged_dispersion(now));
+            let each = ranked
+                .get(i)
+                .map_or(MAX_DISPERSION, |s| s.aged_dispersion(now));
             dispersion += each / (2.0f64).powi(i as i32 + 1);
         }
         let jitter = if ranked.len() > 1 {
-            let sum: f64 = ranked[1..].iter().map(|s| (s.offset - best.offset).powi(2)).sum();
+            let sum: f64 = ranked[1..]
+                .iter()
+                .map(|s| (s.offset - best.offset).powi(2))
+                .sum();
             (sum / (ranked.len() - 1) as f64).sqrt().max(MIN_DISPERSION)
         } else {
             MIN_DISPERSION
         };
-        Some(Filtered { offset: best.offset, delay: best.delay, dispersion, jitter, at: best.at })
+        Some(Filtered {
+            offset: best.offset,
+            delay: best.delay,
+            dispersion,
+            jitter,
+            at: best.at,
+        })
     }
 }
 
@@ -203,7 +219,12 @@ mod tests {
     use super::*;
 
     fn sample(offset: f64, delay: f64, at: f64) -> Sample {
-        Sample { offset, delay, dispersion: MIN_DISPERSION, at }
+        Sample {
+            offset,
+            delay,
+            dispersion: MIN_DISPERSION,
+            at,
+        }
     }
 
     fn update(outcome: FilterOutcome) -> Filtered {
@@ -219,7 +240,11 @@ mod tests {
         update(filter.insert(sample(0.001, 0.010, 1.0), 1.0));
         // A much later, much worse sample must not displace the good one.
         let out = filter.insert(sample(0.050, 0.200, 2.0), 2.0);
-        assert_eq!(out, FilterOutcome::Stale, "the good sample is still the best");
+        assert_eq!(
+            out,
+            FilterOutcome::Stale,
+            "the good sample is still the best"
+        );
         assert!((filter.peek(2.0).unwrap().offset - 0.001).abs() < 1e-9);
     }
 
@@ -271,7 +296,11 @@ mod tests {
         }
         let out = update(filter.insert(sample(5.0, 0.001, 5.0), 5.0));
         assert!((out.offset - 5.0).abs() < 1e-9);
-        assert!(out.jitter > 1.0, "jitter {} should show it is out of family", out.jitter);
+        assert!(
+            out.jitter > 1.0,
+            "jitter {} should show it is out of family",
+            out.jitter
+        );
     }
 
     #[test]
@@ -283,7 +312,10 @@ mod tests {
         assert!(filter.peek(2.0).is_none());
         // And a sample at a time already used is accepted again, because
         // the record of what was used went with it.
-        assert!(matches!(filter.insert(sample(9.0, 0.010, 1.0), 1.0), FilterOutcome::Update(_)));
+        assert!(matches!(
+            filter.insert(sample(9.0, 0.010, 1.0), 1.0),
+            FilterOutcome::Update(_)
+        ));
     }
 
     #[test]
@@ -330,7 +362,13 @@ mod tests {
 
     #[test]
     fn root_distance_includes_half_the_whole_path() {
-        let f = Filtered { offset: 0.0, delay: 0.1, dispersion: 0.0, jitter: 0.0, at: 0.0 };
+        let f = Filtered {
+            offset: 0.0,
+            delay: 0.1,
+            dispersion: 0.0,
+            jitter: 0.0,
+            at: 0.0,
+        };
         // Our 0.1 plus the server's 0.2 is 0.3 of path; half of it is the
         // asymmetry bound.
         assert!((root_distance(&f, 0.2, 0.0, 0.0) - 0.15).abs() < 1e-12);

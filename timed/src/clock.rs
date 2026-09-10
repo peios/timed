@@ -124,7 +124,10 @@ impl Clock {
     /// nonsense — including negative, which is how a poll scheduler ends up
     /// spinning.
     pub fn monotonic(&self) -> f64 {
-        let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+        let mut ts = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
         // Safe: a well-formed timespec, and CLOCK_MONOTONIC always exists.
         let rc = unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts) };
         if rc != 0 {
@@ -307,7 +310,12 @@ mod tests {
         // A zero floor would silently disable the whole mechanism, and the
         // failure would only show up as a machine that cannot bootstrap
         // NTS on a dead RTC — months later, on somebody else's hardware.
-        assert!(BUILD_EPOCH > 1_700_000_000, "floor {BUILD_EPOCH} is not a plausible build time");
+        const {
+            assert!(
+                BUILD_EPOCH > 1_700_000_000,
+                "build floor is not a plausible build time"
+            );
+        }
     }
 
     #[test]

@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use libtimed::{Auth, Origin, Reply, Request, SourceInfo, SourceState, Sync};
-use ntp::{NtpTimestamp, ReferenceId, MAX_PACKET};
+use ntp::{MAX_PACKET, NtpTimestamp, ReferenceId};
 use rustls::ClientConfig;
 
 use timed::clock::{Clock, Leap, Steering};
@@ -44,7 +44,7 @@ use timed::discipline::{Adjustment, Discipline, State};
 use timed::filter::FilterOutcome;
 use timed::netd_link::NetdLink;
 use timed::select::{self, Candidate, NoSelection};
-use timed::source::{Rejected, Security, Source, BURST};
+use timed::source::{BURST, Rejected, Security, Source};
 use timed::state;
 use timed::worker::{Done, Job, Worker};
 use timed::{log, resolve};
@@ -75,7 +75,9 @@ fn main() {
             "the clock read before this build's timestamp; raised it by {by:.0}s so that TLS \
              can work — the real time is not known yet"
         )),
-        Err(e) => log::error(format_args!("could not raise the clock to the build floor: {e}")),
+        Err(e) => log::error(format_args!(
+            "could not raise the clock to the build floor: {e}"
+        )),
     }
 
     let listener = match control::listen() {
@@ -292,8 +294,11 @@ impl Timed {
                 self.entries.push(entry);
                 continue;
             }
-            let security =
-                if spec.unauthenticated { Security::Unauthenticated } else { Security::NtsPending };
+            let security = if spec.unauthenticated {
+                Security::Unauthenticated
+            } else {
+                Security::NtsPending
+            };
             let source = Source::new(
                 spec.host.clone(),
                 // A placeholder until the name resolves; nothing is sent
@@ -372,7 +377,9 @@ impl Timed {
         if !std::mem::take(&mut self.registry_readable) {
             return;
         }
-        let Some(watch) = &self.registry_watch else { return };
+        let Some(watch) = &self.registry_watch else {
+            return;
+        };
         let mut buffer = vec![0u8; 16384];
         // The watch reports *which* values changed; timed does not care,
         // because reading the whole subtree again is cheap and reasoning
@@ -386,7 +393,9 @@ impl Timed {
                 return;
             }
         }
-        log::info(format_args!("the registry changed; re-reading configuration"));
+        log::info(format_args!(
+            "the registry changed; re-reading configuration"
+        ));
         self.reload();
     }
 
@@ -399,7 +408,9 @@ impl Timed {
 
     fn absorb_netd(&mut self) {
         let snapshots = self.netd.service(Instant::now());
-        let Some(latest) = snapshots.into_iter().next_back() else { return };
+        let Some(latest) = snapshots.into_iter().next_back() else {
+            return;
+        };
 
         // Which families this machine can actually reach. A name commonly
         // resolves to both an A and an AAAA, and connecting to the AAAA on
@@ -407,7 +418,10 @@ impl Timed {
         // several addresses times a handshake each is minutes of a boot
         // spent on connections that were never going to work. netd already
         // tells us what addresses the interfaces carry, so use it.
-        let mut families = Families { v4: false, v6: false };
+        let mut families = Families {
+            v4: false,
+            v6: false,
+        };
         for scope in &latest.scopes {
             for address in &scope.addresses {
                 let text = address.split('/').next().unwrap_or(address);
@@ -432,7 +446,11 @@ impl Timed {
                 "usable address families: {}{}{}",
                 if families.v4 { "IPv4 " } else { "" },
                 if families.v6 { "IPv6" } else { "" },
-                if !families.v4 && !families.v6 { "none yet" } else { "" }
+                if !families.v4 && !families.v6 {
+                    "none yet"
+                } else {
+                    ""
+                }
             ));
             // Addresses already chosen may be in a family that just went
             // away, or a family that just arrived may be better.
@@ -531,9 +549,7 @@ impl Timed {
                     log::info(format_args!("loaded the machine's root store for NTS-KE"));
                     self.tls = Some(config);
                 }
-                Done::Roots(Err(e)) => {
-                    log::warn(format_args!("no root store yet ({e}); retrying"))
-                }
+                Done::Roots(Err(e)) => log::warn(format_args!("no root store yet ({e}); retrying")),
                 Done::Resolved { index, result } => {
                     if index >= self.entries.len() {
                         continue;
@@ -541,14 +557,14 @@ impl Timed {
                     self.entries[index].in_flight = false;
                     match result {
                         Ok(resolved) => {
-                            let port =
-                                self.entries[index].spec.port.unwrap_or(ntp::nts::DEFAULT_NTP_PORT);
-                            let addresses =
-                                self.reachable(resolve::socket_addrs(&resolved, port));
+                            let port = self.entries[index]
+                                .spec
+                                .port
+                                .unwrap_or(ntp::nts::DEFAULT_NTP_PORT);
+                            let addresses = self.reachable(resolve::socket_addrs(&resolved, port));
                             if addresses.is_empty() {
-                                self.entries[index].source.note = Some(
-                                    "no address in a family this machine can reach".into(),
-                                );
+                                self.entries[index].source.note =
+                                    Some("no address in a family this machine can reach".into());
                                 self.entries[index].retry_after = now + RETRY_INTERVAL;
                                 continue;
                             }
@@ -592,8 +608,10 @@ impl Timed {
                             ));
                             let _ = state::write_cookies(&self.entries[index].spec.host, &cookies);
                             let entry = &mut self.entries[index];
-                            entry.source.security =
-                                Security::Nts { keys: established.keys.clone(), cookies };
+                            entry.source.security = Security::Nts {
+                                keys: established.keys.clone(),
+                                cookies,
+                            };
                             entry.source.address = addresses[0];
                             entry.addresses = addresses;
                             entry.rekey_after = now + REKEY_INTERVAL;
@@ -606,10 +624,7 @@ impl Timed {
                             // failed to renew keeps working on the cookies
                             // it holds: a rekey is housekeeping, and
                             // failing it should not cost a source.
-                            if matches!(
-                                self.entries[index].source.security,
-                                Security::NtsPending
-                            ) {
+                            if matches!(self.entries[index].source.security, Security::NtsPending) {
                                 log::warn(format_args!(
                                     "{}: NTS-KE failed ({why})",
                                     self.entries[index].spec.host
@@ -651,7 +666,10 @@ impl Timed {
         let bytes = match self.entries[index].source.prepare(wall, now) {
             Ok(b) => b,
             Err(e) => {
-                log::warn(format_args!("{}: cannot build a request: {e}", self.entries[index].spec.host));
+                log::warn(format_args!(
+                    "{}: cannot build a request: {e}",
+                    self.entries[index].spec.host
+                ));
                 self.entries[index].source.schedule(now);
                 return;
             }
@@ -686,7 +704,11 @@ impl Timed {
             return;
         }
         let current = entry.source.address;
-        let position = entry.addresses.iter().position(|a| *a == current).unwrap_or(0);
+        let position = entry
+            .addresses
+            .iter()
+            .position(|a| *a == current)
+            .unwrap_or(0);
         let next = entry.addresses[(position + 1) % entry.addresses.len()];
         entry.source.address = next;
         log::info(format_args!("{}: trying {next} instead", entry.spec.host));
@@ -698,7 +720,9 @@ impl Timed {
     /// costs one failed connection, and refusing to try anything until the
     /// network has been described would be worse.
     fn reachable(&self, addresses: Vec<SocketAddr>) -> Vec<SocketAddr> {
-        let Some(families) = self.families else { return addresses };
+        let Some(families) = self.families else {
+            return addresses;
+        };
         if !families.v4 && !families.v6 {
             return addresses;
         }
@@ -739,7 +763,11 @@ impl Timed {
         // one waiting until the next poll(2) wakes us.
         for family in 0..2 {
             loop {
-                let socket = if family == 0 { self.v4.as_ref() } else { self.v6.as_ref() };
+                let socket = if family == 0 {
+                    self.v4.as_ref()
+                } else {
+                    self.v6.as_ref()
+                };
                 let Some(socket) = socket else { break };
                 let mut buffer = [0u8; MAX_PACKET];
                 let (n, from) = match socket.recv_from(&mut buffer) {
@@ -928,7 +956,9 @@ impl Timed {
         }
 
         for entry in self.entries.iter_mut() {
-            entry.source.adapt_poll(selection.offset, selection.jitter.max(1e-9));
+            entry
+                .source
+                .adapt_poll(selection.offset, selection.jitter.max(1e-9));
         }
 
         if fresh {
@@ -1025,7 +1055,11 @@ impl Timed {
             generation: self.generation,
             sync: self.sync_state(),
             system_peer: self.system_peer.map(|i| self.entries[i].spec.host.clone()),
-            stratum: if self.system_peer.is_some() { self.stratum as u32 } else { 16 },
+            stratum: if self.system_peer.is_some() {
+                self.stratum as u32
+            } else {
+                16
+            },
             offset: self.offset,
             frequency_ppm: self.discipline.frequency_ppm(),
             jitter: self.jitter,
@@ -1044,9 +1078,7 @@ impl Timed {
             selected: self
                 .entries
                 .iter()
-                .filter(|e| {
-                    matches!(e.state, SourceState::Candidate | SourceState::SystemPeer)
-                })
+                .filter(|e| matches!(e.state, SourceState::Candidate | SourceState::SystemPeer))
                 .count() as u32,
             floor: timed::clock::BUILD_EPOCH,
         }
@@ -1067,7 +1099,11 @@ impl Timed {
                         e.source.address.to_string()
                     },
                     origin: e.origin,
-                    auth: if e.source.security.is_nts() { Auth::Nts } else { Auth::None },
+                    auth: if e.source.security.is_nts() {
+                        Auth::Nts
+                    } else {
+                        Auth::None
+                    },
                     state: e.state,
                     stratum: e.source.stratum as u32,
                     reference: e.source.reference_id.to_string(),
@@ -1103,7 +1139,11 @@ impl Timed {
             },
             // Sixteen when not synchronised, which is how the future server
             // refuses to serve without needing a second mechanism.
-            stratum: if synchronised { self.stratum as u32 } else { 16 },
+            stratum: if synchronised {
+                self.stratum as u32
+            } else {
+                16
+            },
             reference_id: self.reference_id.0.to_vec(),
             reference_time: self.reference_time,
             root_delay: self.root_delay,
@@ -1136,12 +1176,15 @@ impl Timed {
             return;
         }
         let bytes = Reply::Snapshot(self.snapshot()).encode();
-        self.subscribers.retain_mut(|s| control::send_nonblocking(s, &bytes));
+        self.subscribers
+            .retain_mut(|s| control::send_nonblocking(s, &bytes));
     }
 
     fn service_control(&mut self) {
         loop {
-            let Ok((mut stream, _)) = self.listener.accept() else { break };
+            let Ok((mut stream, _)) = self.listener.accept() else {
+                break;
+            };
             if self.subscribers.len() >= control::MAX_CLIENTS {
                 let _ = control::write_reply(&mut stream, &Reply::Error("too many clients".into()));
                 continue;
@@ -1168,7 +1211,10 @@ impl Timed {
                     if chunks.is_empty() {
                         let _ = control::write_reply(
                             &mut stream,
-                            &Reply::Sources { sources: Vec::new(), more: false },
+                            &Reply::Sources {
+                                sources: Vec::new(),
+                                more: false,
+                            },
                         );
                     }
                     for (i, chunk) in chunks.iter().enumerate() {
@@ -1249,7 +1295,11 @@ impl Timed {
         });
         let mut fds: Vec<libc::pollfd> = raw
             .into_iter()
-            .map(|fd| libc::pollfd { fd, events: libc::POLLIN, revents: 0 })
+            .map(|fd| libc::pollfd {
+                fd,
+                events: libc::POLLIN,
+                revents: 0,
+            })
             .collect();
         let millis = (timeout.as_millis() as i32).max(1);
         // Safe: a slice we own, with a length that fits, and poll(2) writes
@@ -1306,7 +1356,9 @@ fn notify_ready() {
 }
 
 fn notify(payload: &[u8]) {
-    let Ok(path) = std::env::var("NOTIFY_SOCKET") else { return };
+    let Ok(path) = std::env::var("NOTIFY_SOCKET") else {
+        return;
+    };
     match UnixDatagram::unbound() {
         Ok(s) => {
             if let Err(e) = s.send_to(payload, &path) {

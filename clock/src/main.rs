@@ -12,7 +12,7 @@
 use std::os::unix::net::UnixStream;
 use std::process::ExitCode;
 
-use libtimed::{Reply, Request, SourceState, Sync, SOCKET_PATH};
+use libtimed::{Reply, Request, SOCKET_PATH, SourceState, Sync};
 
 /// Done.
 const OK: u8 = 0;
@@ -141,21 +141,40 @@ fn status() -> u8 {
     println!("jitter       {}", duration(s.jitter));
     // The honest bound: how wrong this machine's time might be. The number
     // a Kerberos deployment actually cares about.
-    println!("accuracy     within {}", duration(s.root_distance).trim_start_matches('+'));
-    println!("  root delay      {}", duration(s.root_delay).trim_start_matches('+'));
-    println!("  root dispersion {}", duration(s.root_dispersion).trim_start_matches('+'));
+    println!(
+        "accuracy     within {}",
+        duration(s.root_distance).trim_start_matches('+')
+    );
+    println!(
+        "  root delay      {}",
+        duration(s.root_delay).trim_start_matches('+')
+    );
+    println!(
+        "  root dispersion {}",
+        duration(s.root_dispersion).trim_start_matches('+')
+    );
     if s.leap != 0 {
         println!(
             "leap         a second will be {} at the end of the day",
             if s.leap > 0 { "inserted" } else { "deleted" }
         );
     }
-    println!("sources      {} configured, {} contributing", s.sources, s.selected);
-    println!("updates      {} (last {} ago)", s.updates, age(s.last_update));
+    println!(
+        "sources      {} configured, {} contributing",
+        s.sources, s.selected
+    );
+    println!(
+        "updates      {} (last {} ago)",
+        s.updates,
+        age(s.last_update)
+    );
     if s.stepped != 0.0 {
         println!("stepped      {} in total since start", duration(s.stepped));
     }
-    println!("floor        {} (the build timestamp; the clock is never set below it)", s.floor);
+    println!(
+        "floor        {} (the build timestamp; the clock is never set below it)",
+        s.floor
+    );
     OK
 }
 

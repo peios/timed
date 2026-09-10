@@ -22,7 +22,10 @@ fn main() {
         .ok()
         .and_then(|s| s.trim().parse::<i64>().ok())
         .unwrap_or_else(|| {
-            SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0)
         });
     println!("cargo:rustc-env=TIMED_BUILD_EPOCH={epoch}");
 }

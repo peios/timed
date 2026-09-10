@@ -42,7 +42,9 @@ pub fn read_drift() -> Option<f64> {
     let text = fs::read_to_string(DRIFT_FILE).ok()?;
     let ppm: f64 = text.trim().parse().ok()?;
     if !ppm.is_finite() || ppm.abs() > MAX_FREQUENCY * 1e6 {
-        log::warn(format_args!("{DRIFT_FILE} holds {ppm}, which is not a plausible frequency; ignored"));
+        log::warn(format_args!(
+            "{DRIFT_FILE} holds {ppm}, which is not a plausible frequency; ignored"
+        ));
         return None;
     }
     Some(ppm / 1e6)
@@ -75,7 +77,13 @@ fn cookie_path(name: &str) -> PathBuf {
     // not need to be: a collision costs a handshake.
     let safe: String = name
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     Path::new(COOKIE_DIR).join(safe)
 }
@@ -130,7 +138,10 @@ pub fn write_cookies(name: &str, cookies: &[Vec<u8>]) -> std::io::Result<()> {
     // observer nothing without the AEAD keys, which are never written down
     // — but they are linkable to this machine, so they are not world
     // readable either.
-    let _ = fs::set_permissions(&temporary, std::os::unix::fs::PermissionsExt::from_mode(0o600));
+    let _ = fs::set_permissions(
+        &temporary,
+        std::os::unix::fs::PermissionsExt::from_mode(0o600),
+    );
     fs::rename(&temporary, path)
 }
 

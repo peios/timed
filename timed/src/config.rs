@@ -74,7 +74,12 @@ pub struct ServerSpec {
 
 impl ServerSpec {
     pub fn new(host: impl Into<String>) -> ServerSpec {
-        ServerSpec { host: host.into(), port: None, prefer: false, unauthenticated: false }
+        ServerSpec {
+            host: host.into(),
+            port: None,
+            prefer: false,
+            unauthenticated: false,
+        }
     }
 }
 
@@ -108,7 +113,10 @@ impl Config {
     }
 
     pub fn fallback() -> Vec<ServerSpec> {
-        FALLBACK_SERVERS.iter().map(|h| ServerSpec::new(*h)).collect()
+        FALLBACK_SERVERS
+            .iter()
+            .map(|h| ServerSpec::new(*h))
+            .collect()
     }
 }
 
@@ -128,7 +136,12 @@ pub fn parse_server(entry: &str) -> Result<ServerSpec, String> {
         return Err(format!("{target:?} is not a host"));
     }
 
-    let mut spec = ServerSpec { host, port, prefer: false, unauthenticated: false };
+    let mut spec = ServerSpec {
+        host,
+        port,
+        prefer: false,
+        unauthenticated: false,
+    };
     for word in words {
         match word {
             "prefer" => spec.prefer = true,
@@ -160,9 +173,13 @@ fn split_host_port(target: &str) -> Result<(String, Option<u16>), String> {
     match target.rsplit_once(':') {
         // More than one colon and no brackets: a bare IPv6 address.
         Some(_) if target.matches(':').count() > 1 => Ok((target.to_string(), None)),
-        Some((host, port)) => {
-            Ok((host.to_string(), Some(port.parse().map_err(|_| format!("{port:?} is not a port"))?)))
-        }
+        Some((host, port)) => Ok((
+            host.to_string(),
+            Some(
+                port.parse()
+                    .map_err(|_| format!("{port:?} is not a port"))?,
+            ),
+        )),
         None => Ok((target.to_string(), None)),
     }
 }
@@ -183,7 +200,9 @@ fn multi(v: &RegValue) -> Option<Vec<String>> {
         ),
         ValueType::SZ | ValueType::EXPAND_SZ => {
             let end = v.data.iter().position(|&b| b == 0).unwrap_or(v.data.len());
-            String::from_utf8(v.data[..end].to_vec()).ok().map(|s| vec![s])
+            String::from_utf8(v.data[..end].to_vec())
+                .ok()
+                .map(|s| vec![s])
         }
         _ => None,
     }
@@ -257,7 +276,10 @@ mod tests {
 
     #[test]
     fn a_bare_host_parses() {
-        assert_eq!(parse_server("time.example.org").unwrap(), ServerSpec::new("time.example.org"));
+        assert_eq!(
+            parse_server("time.example.org").unwrap(),
+            ServerSpec::new("time.example.org")
+        );
     }
 
     #[test]
@@ -307,7 +329,10 @@ mod tests {
         let fallback = Config::fallback();
         assert_eq!(fallback.len(), 4);
         assert!(fallback.iter().all(|s| s.host.ends_with(".time.peios.org")));
-        assert!(fallback.iter().all(|s| !s.unauthenticated), "the fallback is NTS");
+        assert!(
+            fallback.iter().all(|s| !s.unauthenticated),
+            "the fallback is NTS"
+        );
         // Three independent operators is the point; four names is what
         // gives the third a second site.
         assert!(fallback.len() >= 3);
@@ -317,7 +342,10 @@ mod tests {
     fn the_defaults_are_the_safe_ones() {
         let c = Config::default();
         assert!(!c.allow_unauthenticated, "NTS is required by default");
-        assert!(!c.use_from_dhcp, "DHCP time servers are the attacker's on a hostile LAN");
+        assert!(
+            !c.use_from_dhcp,
+            "DHCP time servers are the attacker's on a hostile LAN"
+        );
         assert!(!c.has_explicit_servers());
     }
 }

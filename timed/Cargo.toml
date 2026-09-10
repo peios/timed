@@ -18,12 +18,13 @@ path = "src/main.rs"
 ntp = { path = "../ntp" }
 libc = { workspace = true }
 libtimed = { path = "../libtimed" }
-# Cross-repo path dependencies, as resolvd does for libnetd. Each is the
-# wire crate of a daemon timed talks to: names to resolve, a link state to
-# follow, and the roots an NTS-KE handshake is validated against.
-libresolv = { path = "../../resolvd/libresolv" }
-libnetd = { path = "../../netd/libnetd" }
-libtrust = { path = "../../trustd/libtrust" }
+# Public wire crates for the daemons Timed talks to: names to resolve, a link
+# state to follow, and the roots an NTS-KE handshake is validated against.
+# Exact release commits make both the source graph and corresponding-source
+# package independent of mutable sibling checkouts.
+libresolv = { git = "https://github.com/peios/resolvd.git", rev = "aea35d430d75cb02aa6fa471734ade959112c85b" }
+libnetd = { git = "https://github.com/peios/netd.git", rev = "301fdabdeb5ef67fcaa308b9522f9b24aeef4cf4" }
+libtrust = { git = "https://github.com/peios/trustd.git", rev = "0887b819ce63e96e6d27164ee9ca4179784ce222" }
 peios = { workspace = true }
 # The house TLS stack. NTS-KE is TLS 1.3 with an ALPN of "ntske/1" and a
 # key exported from the session; nothing else about it is unusual.

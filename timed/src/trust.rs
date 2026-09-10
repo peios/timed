@@ -32,8 +32,15 @@ pub fn roots() -> Result<Arc<RootCertStore>, String> {
         .set_read_timeout(Some(std::time::Duration::from_secs(10)))
         .map_err(|e| e.to_string())?;
 
-    libtrust::send(&mut stream, &Request::Roots { with_der: true, purpose: None }.encode())
-        .map_err(|e| format!("asking for roots: {e}"))?;
+    libtrust::send(
+        &mut stream,
+        &Request::Roots {
+            with_der: true,
+            purpose: None,
+        }
+        .encode(),
+    )
+    .map_err(|e| format!("asking for roots: {e}"))?;
 
     // The answer chunks; read until a reply says it is the last.
     let mut replies = Vec::new();

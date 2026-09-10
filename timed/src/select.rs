@@ -30,7 +30,7 @@
 //! shipped fallback set has three operators in three jurisdictions rather
 //! than one well-known name.
 
-use crate::filter::{root_distance, Filtered};
+use crate::filter::{Filtered, root_distance};
 
 /// The stratum at which a server is, by definition, unsynchronised.
 pub const MAX_STRATUM: u8 = 16;
@@ -76,9 +76,7 @@ impl Candidate {
     /// a majority of liars to be rejected in favour of one, which is
     /// exactly backwards.
     pub fn is_fit(&self, now: f64) -> bool {
-        self.usable
-            && self.stratum < MAX_STRATUM
-            && self.root_distance(now) < MAX_DISTANCE
+        self.usable && self.stratum < MAX_STRATUM && self.root_distance(now) < MAX_DISTANCE
     }
 
     pub fn root_distance(&self, now: f64) -> f64 {
@@ -199,9 +197,18 @@ fn intersection(fit: &[&Candidate], now: f64) -> Option<(f64, f64)> {
     let mut points: Vec<Endpoint> = Vec::with_capacity(m * 3);
     for c in fit {
         let distance = c.root_distance(now);
-        points.push(Endpoint { edge: c.filtered.offset - distance, kind: -1 });
-        points.push(Endpoint { edge: c.filtered.offset, kind: 0 });
-        points.push(Endpoint { edge: c.filtered.offset + distance, kind: 1 });
+        points.push(Endpoint {
+            edge: c.filtered.offset - distance,
+            kind: -1,
+        });
+        points.push(Endpoint {
+            edge: c.filtered.offset,
+            kind: 0,
+        });
+        points.push(Endpoint {
+            edge: c.filtered.offset + distance,
+            kind: 1,
+        });
     }
     // Sort by edge, and at equal edges put lower endpoints first so an
     // interval that merely touches another is counted as overlapping it.
@@ -311,15 +318,26 @@ fn combine(survivors: &[&Candidate], now: f64) -> (f64, f64) {
         weight_sum += 1.0 / distance;
         offset_sum += c.filtered.offset / distance;
     }
-    let offset = if weight_sum > 0.0 { offset_sum / weight_sum } else { 0.0 };
+    let offset = if weight_sum > 0.0 {
+        offset_sum / weight_sum
+    } else {
+        0.0
+    };
 
     // System jitter: how far the survivors sit from the one we chose, plus
     // that one's own noise. Both matter — a set of sources that agree
     // perfectly but are individually noisy is not a precise answer.
     let head = survivors[0].filtered.offset;
-    let spread: f64 = survivors.iter().map(|c| (c.filtered.offset - head).powi(2)).sum();
+    let spread: f64 = survivors
+        .iter()
+        .map(|c| (c.filtered.offset - head).powi(2))
+        .sum();
     let n = survivors.len();
-    let selection_jitter = if n > 1 { (spread / (n - 1) as f64).sqrt() } else { 0.0 };
+    let selection_jitter = if n > 1 {
+        (spread / (n - 1) as f64).sqrt()
+    } else {
+        0.0
+    };
     let jitter = (selection_jitter.powi(2) + survivors[0].filtered.jitter.powi(2)).sqrt();
     (offset, jitter)
 }
@@ -438,7 +456,11 @@ mod tests {
     fn a_preferred_source_leads_but_does_not_get_to_be_wrong() {
         let mut preferred = candidate(2, 0.001, 0.01);
         preferred.prefer = true;
-        let c = [candidate(0, 0.000, 0.01), candidate(1, 0.002, 0.01), preferred];
+        let c = [
+            candidate(0, 0.000, 0.01),
+            candidate(1, 0.002, 0.01),
+            preferred,
+        ];
         assert_eq!(select(&c, 0.0).unwrap().system_peer, 2);
 
         // Now make it a falseticker. Preference must not save it.
@@ -492,7 +514,10 @@ mod tests {
         }
         let s = select(&c, 0.0).unwrap();
         assert!(s.survivors.len() >= MIN_SURVIVORS);
-        assert!(!s.survivors.contains(&5), "the outlier should be clustered out");
+        assert!(
+            !s.survivors.contains(&5),
+            "the outlier should be clustered out"
+        );
     }
 
     #[test]

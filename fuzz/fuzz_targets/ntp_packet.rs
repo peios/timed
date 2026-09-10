@@ -8,7 +8,9 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let Ok(packet) = ntp::Packet::decode(data) else { return };
+    let Ok(packet) = ntp::Packet::decode(data) else {
+        return;
+    };
 
     // A packet that decoded must re-encode without panicking, and every
     // accessor over it must be total. Round-tripping is deliberately not

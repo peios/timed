@@ -64,7 +64,10 @@ fn padded_len(value_len: usize) -> usize {
 
 impl ExtensionField {
     pub fn new(field_type: u16, value: impl Into<Vec<u8>>) -> ExtensionField {
-        ExtensionField { field_type, value: value.into() }
+        ExtensionField {
+            field_type,
+            value: value.into(),
+        }
     }
 
     /// Append this field, padded, to a buffer.
@@ -110,12 +113,24 @@ pub fn decode_all_with_mac(
             // that key and your MAC was wrong".
             4 => {
                 let key_id = u32::from_be_bytes([rest[0], rest[1], rest[2], rest[3]]);
-                return Ok((fields, Some(LegacyMac { key_id, digest: Vec::new() })));
+                return Ok((
+                    fields,
+                    Some(LegacyMac {
+                        key_id,
+                        digest: Vec::new(),
+                    }),
+                ));
             }
             // Key identifier plus a 128- or 160-bit digest.
             20 | 24 => {
                 let key_id = u32::from_be_bytes([rest[0], rest[1], rest[2], rest[3]]);
-                return Ok((fields, Some(LegacyMac { key_id, digest: rest[4..].to_vec() })));
+                return Ok((
+                    fields,
+                    Some(LegacyMac {
+                        key_id,
+                        digest: rest[4..].to_vec(),
+                    }),
+                ));
             }
             len if len < MIN_FIELD => return Err(WireError::BadLength(len as u32)),
             _ => {}
@@ -129,7 +144,7 @@ pub fn decode_all_with_mac(
         // size would advance the cursor by zero or backwards, and an
         // implementation that trusts it loops forever on a four-byte
         // datagram anyone can send.
-        if field_len < MIN_FIELD || field_len % 4 != 0 || field_len > rest.len() {
+        if field_len < MIN_FIELD || !field_len.is_multiple_of(4) || field_len > rest.len() {
             return Err(WireError::BadLength(field_len as u32));
         }
 
@@ -177,7 +192,10 @@ mod tests {
         // The whole reason the minimum is enforced in the parser. Before
         // the check, this input advances the cursor by zero and spins.
         let bytes = [0x01, 0x04, 0x00, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        assert!(matches!(decode_all_with_mac(&bytes), Err(WireError::BadLength(0))));
+        assert!(matches!(
+            decode_all_with_mac(&bytes),
+            Err(WireError::BadLength(0))
+        ));
     }
 
     #[test]
@@ -189,7 +207,10 @@ mod tests {
         // check with a declared 64.
         bytes.resize(28, 0);
         bytes[2..4].copy_from_slice(&64u16.to_be_bytes());
-        assert!(matches!(decode_all_with_mac(&bytes), Err(WireError::BadLength(64))));
+        assert!(matches!(
+            decode_all_with_mac(&bytes),
+            Err(WireError::BadLength(64))
+        ));
     }
 
     #[test]
@@ -197,7 +218,10 @@ mod tests {
         let mut bytes = vec![0u8; 32];
         bytes[0..2].copy_from_slice(&0x0104u16.to_be_bytes());
         bytes[2..4].copy_from_slice(&18u16.to_be_bytes());
-        assert!(matches!(decode_all_with_mac(&bytes), Err(WireError::BadLength(18))));
+        assert!(matches!(
+            decode_all_with_mac(&bytes),
+            Err(WireError::BadLength(18))
+        ));
     }
 
     #[test]
@@ -216,6 +240,9 @@ mod tests {
     #[test]
     fn a_short_unaccountable_tail_is_malformed() {
         // Eight bytes is neither a legal field nor any legal MAC length.
-        assert!(matches!(decode_all_with_mac(&[0u8; 8]), Err(WireError::BadLength(8))));
+        assert!(matches!(
+            decode_all_with_mac(&[0u8; 8]),
+            Err(WireError::BadLength(8))
+        ));
     }
 }
