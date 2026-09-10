@@ -1,2 +1,0 @@
-cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH
-cargo:rustc-env=TIMED_BUILD_EPOCH=1788142953

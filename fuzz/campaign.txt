@@ -1,6 +1,0 @@
-time_wire exit=1
-nts_authenticator exit=1
-nts_ke exit=1
-engine_ops exit=1
-source_accept exit=1
-ntp_packet exit=1
