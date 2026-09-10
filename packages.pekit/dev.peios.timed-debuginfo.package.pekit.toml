@@ -1,0 +1,11 @@
+[package]
+name        = "dev.peios.timed-debuginfo"
+description = "Debugging symbols for the Peios time service"
+
+[dependencies]
+"dev.peios.timed" = "= {{version}}-1"
+
+[files]
+"@source:LICENSE"                  = "usr/share/licenses/dev.peios.timed-debuginfo/LICENSE"
+":licenses/**"                     = "usr/share/licenses/dev.peios.timed-debuginfo/third-party"
+":debug/timed/usr/lib/debug/**"    = "usr/lib/debug"

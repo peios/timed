@@ -23,11 +23,20 @@ members = ["ntp", "libtimed", "timed", "clock"]
 # (netd/resolvd, authd/lpsd) exists to avoid.
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
+rust-version = "1.98.1"
 license = "MIT"
 publish = false
 
+[profile.release]
+# Packaging splits symbols after linking. Keep full DWARF in the release
+# executable until that split has happened, and keep incremental state out of
+# release reproducibility.
+debug = 2
+split-debuginfo = "off"
+incremental = false
+
 [workspace.dependencies]
 libc = "0.2"
-peios = { path = "../peios-rs/peios" }
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "f4309f78fbaa878a14429a5e07d778dba9ddfab7", package = "peios" }

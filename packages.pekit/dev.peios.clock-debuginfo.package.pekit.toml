@@ -1,0 +1,11 @@
+[package]
+name        = "dev.peios.clock-debuginfo"
+description = "Debugging symbols for the Peios time operator command"
+
+[dependencies]
+"dev.peios.clock" = "= {{version}}-1"
+
+[files]
+"@source:LICENSE"                  = "usr/share/licenses/dev.peios.clock-debuginfo/LICENSE"
+":licenses/**"                     = "usr/share/licenses/dev.peios.clock-debuginfo/third-party"
+":debug/clock/usr/lib/debug/**"    = "usr/lib/debug"

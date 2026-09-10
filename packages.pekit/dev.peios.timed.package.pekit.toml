@@ -1,0 +1,31 @@
+# Keep man-db's search index coherent when the service manual is installed.
+side_effects = ["man-db"]
+
+# The privileged time authority, its least-privilege service policy, and its
+# inert registry documentation. `clock` is intentionally a separate package.
+[package]
+name        = "dev.peios.timed"
+description = "Peios authenticated network time synchronisation service"
+
+[provides]
+timed = "{{version}}-1"
+
+[replaces]
+timed = "<= 0.1.0-8"
+
+[dependencies]
+"dev.peios.libpeios" = ">= 0.5.0"
+"org.gnu.glibc"      = "*"
+"org.gnu.gcc-libgcc" = "*"
+sh                     = "*"
+peiosutils             = "*"
+
+[files]
+"@source:LICENSE"                         = "usr/share/licenses/dev.peios.timed/LICENSE"
+":licenses/**"                            = "usr/share/licenses/dev.peios.timed/third-party"
+":usr/sbin/timed"                         = "usr/sbin/timed"
+":usr/libexec/timed/prepare-state"        = "usr/libexec/timed/prepare-state"
+":usr/share/regim/timed-service.reg"      = "usr/share/regim/timed-service.reg"
+":usr/share/regim/timed-policy.reg"       = "usr/share/regim/timed-policy.reg"
+":usr/share/regman/timed.regman"          = "usr/share/regman/timed.regman"
+":usr/share/man/man8/timed.8.gz"          = "usr/share/man/man8/timed.8.gz"

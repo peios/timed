@@ -1,0 +1,67 @@
+.TH TIMED 8 "Peios" "timed 0.1.1" "System Administration"
+.SH NAME
+timed \- Peios authenticated network time client
+.SH SYNOPSIS
+.B /usr/sbin/timed
+.SH DESCRIPTION
+.B timed
+keeps the system clock synchronised with configured network sources.  It is
+the only service granted
+.B SeSystemtimePrivilege
+in the standard Peios image.  The daemon initiates NTP and Network Time
+Security connections but listens on no network port.
+.PP
+At startup it raises a clock older than the reproducible build timestamp to
+that timestamp.  This conservative floor permits certificate validation on a
+machine with an absent or failed real-time clock; it is not considered a
+successful time synchronisation.
+.PP
+Network Time Security is required by default.  Plain NTP is used only when an
+administrator explicitly enables it for a source.  Source selection requires
+agreement and rejects outliers rather than allowing a preferred source to
+override the majority.
+.SH CONFIGURATION
+The daemon watches
+.B Machine\\System\\Time
+in the Peios registry.  Important values are:
+.TP
+.B Servers
+A REG_MULTI_SZ list of hosts, optionally followed by
+.B prefer
+or
+.BR unauthenticated .
+.TP
+.B AllowUnauthenticated
+A REG_DWORD enabling explicitly marked plain-NTP sources.  The secure default
+is zero.
+.TP
+.B UseFromDHCP
+A REG_DWORD allowing DHCP option 42 when no explicit source list exists.  The
+secure default is zero.
+.TP
+.BR MinPoll , " MaxPoll"
+REG_DWORD base-two polling intervals, bounded by the daemon.
+.PP
+Complete field semantics and security notes are installed as the
+.B timed.regman
+registry manual.
+.SH FILES
+.TP
+.B /run/timed/time.sock
+Local query and control socket.
+.TP
+.B /var/state/timed/drift
+Persisted learned oscillator frequency.
+.TP
+.B /var/state/timed/cookies/
+Persisted NTS cookies.  This directory is private to SYSTEM,
+Administrators, and timed's service SID.
+.SH SERVICE INTEGRATION
+The package supplies inert Registry Image Manager seeds for the service,
+time policy, and the service-SID privilege grant.  An image must explicitly
+select those seeds.  The service runs as LocalService; its pre-start hook runs
+as SYSTEM only to provision the protected state directory.
+.SH SEE ALSO
+.BR clock (1),
+.BR reg (1),
+.BR svctl (1)
