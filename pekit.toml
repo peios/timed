@@ -72,7 +72,7 @@ export CARGO_HOME=$PEKIT_OUT/cargo-home
 mkdir -p "$CARGO_HOME"
 cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
 
-for tool in cargo rustc git gcc pkg-config python3 find sort cmp readelf objcopy strip debugedit gzip; do
+for tool in cargo rustc gcc pkg-config python3 find sort cmp readelf objcopy strip debugedit gzip; do
   command -v "$tool" >/dev/null || {
     echo "timed: missing required build tool: $tool" >&2
     exit 1
@@ -100,9 +100,10 @@ if versions != [expected]:
 '
 
 # The clock floor must be both safe and reproducible. A Git release's commit
-# timestamp meets both requirements; explicit SOURCE_DATE_EPOCH still wins.
+# timestamp supplied by Pekit meets both requirements; an explicit
+# SOURCE_DATE_EPOCH still wins for a controlled rebuild.
 if test -z "${SOURCE_DATE_EPOCH:-}"; then
-  SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+  SOURCE_DATE_EPOCH=${PEKIT_SOURCE_TIMESTAMP:-}
 fi
 case "$SOURCE_DATE_EPOCH" in
   ''|*[!0-9]*) echo "timed: SOURCE_DATE_EPOCH is not an epoch" >&2; exit 1 ;;
@@ -252,6 +253,7 @@ done
 [build.main.dependencies.peipkg]
 "org.git.kernel.dash"      = "*"
 "org.gnu.coreutils"        = "*"
+"org.gnu.diffutils"        = "*"
 "org.gnu.findutils"        = "*"
 "org.gnu.grep"             = "*"
 "org.gnu.sed"              = "*"
@@ -272,7 +274,6 @@ findutils       = "*"
 grep            = "*"
 sed             = "*"
 gzip            = "*"
-git             = "*"
 cargo           = "*"
 rustc           = "*"
 gcc             = "*"

@@ -11,6 +11,11 @@ import subprocess
 
 
 NOTICE_PREFIXES = ("LICENSE", "COPYING", "NOTICE", "UNLICENSE")
+PEIOS_GIT_NOTICES = {
+    "git+https://github.com/peios/netd.git": pathlib.Path("third-party/netd-LICENSE"),
+    "git+https://github.com/peios/resolvd.git": pathlib.Path("third-party/resolvd-LICENSE"),
+    "git+https://github.com/peios/trustd.git": pathlib.Path("third-party/trustd-LICENSE"),
+}
 
 
 def metadata() -> dict:
@@ -79,6 +84,11 @@ def main() -> None:
             # peios-rs keeps its common MIT notice. Carry the reviewed notice
             # in this release until those crates gain package-local copies.
             notices = [pathlib.Path("third-party/peios-rs-LICENSE")]
+        if not notices:
+            for prefix, notice in PEIOS_GIT_NOTICES.items():
+                if source.startswith(prefix):
+                    notices = [notice]
+                    break
         if not notices:
             raise SystemExit(
                 f"{package['name']} {package['version']} has no distributable licence notice"
