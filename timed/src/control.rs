@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use libtimed::{
-    Reply, Request, SOCKET_PATH, TIMED_RUN_DIR, TIME_ALL_ACCESS, TIME_CONTROL, TIME_QUERY,
+    Reply, Request, SOCKET_PATH, TIME_ALL_ACCESS, TIME_CONTROL, TIME_QUERY, TIMED_RUN_DIR,
 };
 use peios::access::AccessCheck;
 use peios::security::{
@@ -81,7 +81,11 @@ pub fn protect(path: &Path) {
     let system = Sid::well_known(WellKnown::System);
     let everyone = Sid::well_known(WellKnown::Everyone);
     let descriptor = AclBuilder::new()
-        .allow(system.as_ref(), AccessMask::GENERIC_ALL.bits(), AceFlags::empty())
+        .allow(
+            system.as_ref(),
+            AccessMask::GENERIC_ALL.bits(),
+            AceFlags::empty(),
+        )
         .allow(
             everyone.as_ref(),
             AccessMask::GENERIC_READ.bits()
@@ -119,7 +123,9 @@ impl ControlObject {
                 )),
             }
         }
-        ControlObject { sd: Self::default_sd() }
+        ControlObject {
+            sd: Self::default_sd(),
+        }
     }
 
     fn default_sd() -> SecurityDescriptor {
@@ -129,39 +135,62 @@ impl ControlObject {
         AclBuilder::new()
             .allow(system.as_ref(), TIME_ALL_ACCESS, AceFlags::empty())
             .allow(administrators.as_ref(), TIME_ALL_ACCESS, AceFlags::empty())
-            .allow(everyone.as_ref(), TIME_QUERY | AccessMask::READ_CONTROL.bits(), AceFlags::empty())
+            .allow(
+                everyone.as_ref(),
+                TIME_QUERY | AccessMask::READ_CONTROL.bits(),
+                AceFlags::empty(),
+            )
             .build()
             .and_then(|dacl| {
-                SdBuilder::new().owner(system.as_ref()).group(system.as_ref()).dacl(&dacl).build()
+                SdBuilder::new()
+                    .owner(system.as_ref())
+                    .group(system.as_ref())
+                    .dacl(&dacl)
+                    .build()
             })
             .expect("the compiled default descriptor builds")
     }
 
     fn mapping() -> GenericMapping {
         let rc = AccessMask::READ_CONTROL.bits();
-        GenericMapping::new(TIME_QUERY | rc, TIME_CONTROL | rc, TIME_QUERY, TIME_ALL_ACCESS)
+        GenericMapping::new(
+            TIME_QUERY | rc,
+            TIME_CONTROL | rc,
+            TIME_QUERY,
+            TIME_ALL_ACCESS,
+        )
     }
 
     pub fn permits(&self, stream: &UnixStream, right: u32) -> bool {
         let token = match Token::open_peer(stream.as_fd()) {
             Ok(t) => t,
             Err(e) => {
-                log::warn(format_args!("could not read a peer's token ({e}); refusing"));
+                log::warn(format_args!(
+                    "could not read a peer's token ({e}); refusing"
+                ));
                 return false;
             }
         };
-        AccessCheck::new(&self.sd, AccessMask::from_bits_retain(right), Self::mapping())
-            .token(token.as_fd())
-            .check()
-            .map(|d| d.allowed)
-            .unwrap_or(false)
+        AccessCheck::new(
+            &self.sd,
+            AccessMask::from_bits_retain(right),
+            Self::mapping(),
+        )
+        .token(token.as_fd())
+        .check()
+        .map(|d| d.allowed)
+        .unwrap_or(false)
     }
 }
 
 /// Read one request from a connected peer.
 pub fn read_request(stream: &mut UnixStream) -> Result<Request, String> {
-    stream.set_read_timeout(Some(CLIENT_TIMEOUT)).map_err(|e| e.to_string())?;
-    stream.set_write_timeout(Some(WRITE_TIMEOUT)).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(CLIENT_TIMEOUT))
+        .map_err(|e| e.to_string())?;
+    stream
+        .set_write_timeout(Some(WRITE_TIMEOUT))
+        .map_err(|e| e.to_string())?;
     let bytes = libtimed::recv(stream).map_err(|e| e.to_string())?;
     Request::decode(&bytes).map_err(|e| e.to_string())
 }

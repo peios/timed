@@ -30,7 +30,10 @@ pub fn lookup(name: &str) -> Result<Resolved, String> {
         .set_read_timeout(Some(std::time::Duration::from_secs(10)))
         .map_err(|e| e.to_string())?;
 
-    let request = Request::Lookup { name: name.to_string(), family: Family::Any };
+    let request = Request::Lookup {
+        name: name.to_string(),
+        family: Family::Any,
+    };
     match libresolv::call(&mut stream, &request).map_err(|e| e.to_string())? {
         Reply::Addresses(a) => {
             if a.outcome != Outcome::Found || a.addresses.is_empty() {
@@ -56,5 +59,9 @@ pub fn lookup(name: &str) -> Result<Resolved, String> {
 
 /// Pair a resolved name with a port.
 pub fn socket_addrs(resolved: &Resolved, port: u16) -> Vec<SocketAddr> {
-    resolved.addresses.iter().map(|&a| SocketAddr::new(a, port)).collect()
+    resolved
+        .addresses
+        .iter()
+        .map(|&a| SocketAddr::new(a, port))
+        .collect()
 }

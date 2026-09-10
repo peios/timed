@@ -27,7 +27,7 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
 use std::time::Duration;
 
-use ntp::nts::{self, KeError, Keys, Negotiated, Record, ALPN, MAX_KE_MESSAGE};
+use ntp::nts::{self, ALPN, KeError, Keys, MAX_KE_MESSAGE, Negotiated, Record};
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use rustls_pki_types::ServerName;
 
@@ -92,7 +92,9 @@ pub fn handshake(
 
     let mut socket = TcpStream::connect_timeout(&address, HANDSHAKE_TIMEOUT)
         .map_err(|e| KeFailure::Connect(format!("connecting to {address}: {e}")))?;
-    socket.set_read_timeout(Some(HANDSHAKE_TIMEOUT)).map_err(|e| KeFailure::Connect(e.to_string()))?;
+    socket
+        .set_read_timeout(Some(HANDSHAKE_TIMEOUT))
+        .map_err(|e| KeFailure::Connect(e.to_string()))?;
     socket
         .set_write_timeout(Some(HANDSHAKE_TIMEOUT))
         .map_err(|e| KeFailure::Connect(e.to_string()))?;
@@ -103,7 +105,8 @@ pub fn handshake(
 
     {
         let mut tls = rustls::Stream::new(&mut connection, &mut socket);
-        tls.write_all(&nts::client_request()).map_err(|e| KeFailure::Tls(e.to_string()))?;
+        tls.write_all(&nts::client_request())
+            .map_err(|e| KeFailure::Tls(e.to_string()))?;
         tls.flush().map_err(|e| KeFailure::Tls(e.to_string()))?;
     }
 
@@ -120,7 +123,9 @@ pub fn handshake(
             )));
         }
         None => {
-            return Err(KeFailure::Tls("the server selected no ALPN; not an NTS-KE server".into()));
+            return Err(KeFailure::Tls(
+                "the server selected no ALPN; not an NTS-KE server".into(),
+            ));
         }
     }
 
@@ -131,13 +136,24 @@ pub fn handshake(
     let mut c2s = [0u8; nts::KEY_LEN];
     let mut s2c = [0u8; nts::KEY_LEN];
     connection
-        .export_keying_material(&mut c2s, nts::EXPORTER_LABEL, Some(&nts::exporter_context(true)))
+        .export_keying_material(
+            &mut c2s,
+            nts::EXPORTER_LABEL,
+            Some(&nts::exporter_context(true)),
+        )
         .map_err(|e| KeFailure::Tls(format!("exporting the c2s key: {e}")))?;
     connection
-        .export_keying_material(&mut s2c, nts::EXPORTER_LABEL, Some(&nts::exporter_context(false)))
+        .export_keying_material(
+            &mut s2c,
+            nts::EXPORTER_LABEL,
+            Some(&nts::exporter_context(false)),
+        )
         .map_err(|e| KeFailure::Tls(format!("exporting the s2c key: {e}")))?;
 
-    Ok(Established { keys: Keys { c2s, s2c }, negotiated })
+    Ok(Established {
+        keys: Keys { c2s, s2c },
+        negotiated,
+    })
 }
 
 /// Read records until the message is complete.
@@ -155,9 +171,9 @@ fn read_message(
         // broken or has turned hostile rather than against a stranger —
         // which is a category worth defending against anyway.
         if buffer.len() > MAX_KE_MESSAGE {
-            return Err(KeFailure::Protocol(KeError::Wire(ntp::WireError::BadLength(
-                buffer.len() as u32,
-            ))));
+            return Err(KeFailure::Protocol(KeError::Wire(
+                ntp::WireError::BadLength(buffer.len() as u32),
+            )));
         }
         match nts::Record::decode_message(&buffer) {
             Ok(Some(records)) => return Ok(records),
@@ -166,9 +182,13 @@ fn read_message(
         }
 
         let mut tls = rustls::Stream::new(connection, socket);
-        let n = tls.read(&mut chunk).map_err(|e| KeFailure::Tls(e.to_string()))?;
+        let n = tls
+            .read(&mut chunk)
+            .map_err(|e| KeFailure::Tls(e.to_string()))?;
         if n == 0 {
-            return Err(KeFailure::Tls("the server closed before ending its message".into()));
+            return Err(KeFailure::Tls(
+                "the server closed before ending its message".into(),
+            ));
         }
         buffer.extend_from_slice(&chunk[..n]);
     }

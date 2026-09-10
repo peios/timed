@@ -27,10 +27,10 @@
 
 use std::net::SocketAddr;
 
-use ntp::nts::{self, Keys, COOKIE_TARGET, MAX_COOKIE};
+use ntp::nts::{self, COOKIE_TARGET, Keys, MAX_COOKIE};
 use ntp::{
-    ExtensionField, LeapIndicator, Mode, NtpTimestamp, Packet, ReferenceId, NTS_AUTHENTICATOR,
-    NTS_COOKIE, NTS_COOKIE_PLACEHOLDER, NTS_UNIQUE_IDENTIFIER,
+    ExtensionField, LeapIndicator, Mode, NTS_AUTHENTICATOR, NTS_COOKIE, NTS_COOKIE_PLACEHOLDER,
+    NTS_UNIQUE_IDENTIFIER, NtpTimestamp, Packet, ReferenceId,
 };
 
 use crate::clock::Leap;
@@ -277,7 +277,9 @@ impl Source {
                     NTS_UNIQUE_IDENTIFIER,
                     unique_id.clone(),
                 ));
-                packet.extensions.push(ExtensionField::new(NTS_COOKIE, cookie.clone()));
+                packet
+                    .extensions
+                    .push(ExtensionField::new(NTS_COOKIE, cookie.clone()));
                 // One placeholder per cookie we want back. Each is the size
                 // of a cookie, which is what keeps request and reply the
                 // same size.
@@ -305,7 +307,9 @@ impl Source {
             }
             Security::Unauthenticated => packet.encode(),
             Security::NtsPending => {
-                return Err(std::io::Error::other("no cookies; NTS-KE has not completed"));
+                return Err(std::io::Error::other(
+                    "no cookies; NTS-KE has not completed",
+                ));
             }
         };
 
@@ -405,7 +409,9 @@ impl Source {
         bytes: &[u8],
         key: &[u8; nts::KEY_LEN],
     ) -> Result<Vec<Vec<u8>>, Rejected> {
-        let field = packet.extension(NTS_AUTHENTICATOR).ok_or(Rejected::NotAuthentic)?;
+        let field = packet
+            .extension(NTS_AUTHENTICATOR)
+            .ok_or(Rejected::NotAuthentic)?;
         // Where the authenticator begins in the datagram we received, which
         // is what its tag covers. Computed by walking the fields that
         // precede it rather than by re-encoding the parsed packet: the tag
@@ -523,7 +529,9 @@ impl Source {
 
     /// Has the outstanding request timed out?
     pub fn timed_out(&self, monotonic: f64) -> bool {
-        self.pending.as_ref().is_some_and(|p| monotonic - p.sent_at > REPLY_TIMEOUT)
+        self.pending
+            .as_ref()
+            .is_some_and(|p| monotonic - p.sent_at > REPLY_TIMEOUT)
     }
 }
 
@@ -579,7 +587,10 @@ mod tests {
             "test".into(),
             address(),
             Security::Nts {
-                keys: Keys { c2s: [1; nts::KEY_LEN], s2c: [2; nts::KEY_LEN] },
+                keys: Keys {
+                    c2s: [1; nts::KEY_LEN],
+                    s2c: [2; nts::KEY_LEN],
+                },
                 cookies: (0..cookies).map(|i| vec![i as u8; 100]).collect(),
             },
             DEFAULT_MIN_POLL,
@@ -662,11 +673,17 @@ mod tests {
 
         let mut broadcast = reply_to(&request, 0);
         broadcast.mode = Mode::Broadcast;
-        assert_eq!(source.accept(&broadcast.encode(), destination, 1.0), Err(Rejected::NotAReply));
+        assert_eq!(
+            source.accept(&broadcast.encode(), destination, 1.0),
+            Err(Rejected::NotAReply)
+        );
 
         let mut old = reply_to(&request, 0);
         old.version = 3;
-        assert_eq!(source.accept(&old.encode(), destination, 1.0), Err(Rejected::NotAReply));
+        assert_eq!(
+            source.accept(&old.encode(), destination, 1.0),
+            Err(Rejected::NotAReply)
+        );
     }
 
     #[test]
@@ -701,8 +718,11 @@ mod tests {
 
         // Enough placeholders to get back to a full set: we hold 2 and are
         // spending 1, so 8 − 3 = 5 more are wanted.
-        let placeholders =
-            packet.extensions.iter().filter(|f| f.field_type == NTS_COOKIE_PLACEHOLDER).count();
+        let placeholders = packet
+            .extensions
+            .iter()
+            .filter(|f| f.field_type == NTS_COOKIE_PLACEHOLDER)
+            .count();
         assert_eq!(placeholders, COOKIE_TARGET - 3);
     }
 
@@ -736,7 +756,9 @@ mod tests {
         // tag: this is the packet an attacker who watched the request could
         // build.
         let mut reply = reply_to(&request, 0);
-        reply.extensions.push(asked.extension(NTS_UNIQUE_IDENTIFIER).unwrap().clone());
+        reply
+            .extensions
+            .push(asked.extension(NTS_UNIQUE_IDENTIFIER).unwrap().clone());
         assert_eq!(
             source.accept(&reply.encode(), destination, 1.0),
             Err(Rejected::NotAuthentic)
@@ -754,7 +776,9 @@ mod tests {
         // Build the reply as a real server would: header and identifier,
         // then an authenticator whose ciphertext holds fresh cookies.
         let mut reply = reply_to(&request, 0);
-        reply.extensions.push(asked.extension(NTS_UNIQUE_IDENTIFIER).unwrap().clone());
+        reply
+            .extensions
+            .push(asked.extension(NTS_UNIQUE_IDENTIFIER).unwrap().clone());
         let prefix = reply.encode();
         let mut plaintext = Vec::new();
         for i in 0..3u8 {
@@ -766,7 +790,9 @@ mod tests {
         authenticator.encode_into(&mut bytes);
 
         let destination = NtpTimestamp::from_unix(1_756_000_000, 50_000_000);
-        source.accept(&bytes, destination, 1.0).expect("an authentic reply is accepted");
+        source
+            .accept(&bytes, destination, 1.0)
+            .expect("an authentic reply is accepted");
         // One spent, three returned.
         assert_eq!(source.security.cookies(), 4);
     }
@@ -780,7 +806,9 @@ mod tests {
         let asked = Packet::decode(&request).unwrap();
 
         let mut reply = reply_to(&request, 0);
-        reply.extensions.push(asked.extension(NTS_UNIQUE_IDENTIFIER).unwrap().clone());
+        reply
+            .extensions
+            .push(asked.extension(NTS_UNIQUE_IDENTIFIER).unwrap().clone());
         let prefix = reply.encode();
         let authenticator =
             nts::seal_authenticator(&s2c, &[7u8; nts::NONCE_LEN], &prefix, &[]).unwrap();
@@ -791,13 +819,19 @@ mod tests {
         // of the attack — leaving the tag as it was.
         bytes[40] = bytes[40].wrapping_add(1);
         let destination = NtpTimestamp::from_unix(1_756_000_000, 50_000_000);
-        assert_eq!(source.accept(&bytes, destination, 1.0), Err(Rejected::NotAuthentic));
+        assert_eq!(
+            source.accept(&bytes, destination, 1.0),
+            Err(Rejected::NotAuthentic)
+        );
     }
 
     #[test]
     fn an_nts_source_without_cookies_is_not_polled() {
         let source = nts_source(0);
-        assert!(!source.can_poll(), "polling without a cookie would be a silent downgrade");
+        assert!(
+            !source.can_poll(),
+            "polling without a cookie would be a silent downgrade"
+        );
         let pending = Source::new(
             "test".into(),
             address(),
@@ -815,7 +849,9 @@ mod tests {
         let wall = NtpTimestamp::from_unix(1_756_000_000, 0);
         let request = source.prepare(wall, 0.0).unwrap();
         let destination = NtpTimestamp::from_unix(1_756_000_000, 50_000_000);
-        let sample = source.accept(&reply_to(&request, 0).encode(), destination, 1.0).unwrap();
+        let sample = source
+            .accept(&reply_to(&request, 0).encode(), destination, 1.0)
+            .unwrap();
         source.filter.insert(sample, 1.0);
         assert!(!source.filter.is_empty());
 
@@ -823,7 +859,10 @@ mod tests {
             source.record_loss(i as f64);
         }
         assert_eq!(source.reach, 0);
-        assert!(source.filter.is_empty(), "a vanished source must stop voting");
+        assert!(
+            source.filter.is_empty(),
+            "a vanished source must stop voting"
+        );
         assert!(source.note.is_some());
     }
 
@@ -880,14 +919,19 @@ mod tests {
         }
         let base = (2.0f64).powi(DEFAULT_MIN_POLL as i32);
         assert!(times.iter().all(|&t| t >= base && t <= base * 1.25));
-        let distinct: std::collections::BTreeSet<u64> =
-            times.iter().map(|t| t.to_bits()).collect();
+        let distinct: std::collections::BTreeSet<u64> = times.iter().map(|t| t.to_bits()).collect();
         assert!(distinct.len() > 15, "the interval is barely being spread");
     }
 
     #[test]
     fn a_configuration_error_cannot_make_us_a_nuisance() {
-        let source = Source::new("test".into(), address(), Security::Unauthenticated, -100, 100);
+        let source = Source::new(
+            "test".into(),
+            address(),
+            Security::Unauthenticated,
+            -100,
+            100,
+        );
         assert_eq!(source.min_poll, POLL_FLOOR);
         assert!(source.max_poll <= POLL_CEILING);
         // And an inverted pair does not produce a range with no values.

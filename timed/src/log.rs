@@ -19,7 +19,13 @@ use std::sync::OnceLock;
 
 fn kmsg() -> Option<&'static std::fs::File> {
     static KMSG: OnceLock<Option<std::fs::File>> = OnceLock::new();
-    KMSG.get_or_init(|| std::fs::OpenOptions::new().write(true).open("/dev/kmsg").ok()).as_ref()
+    KMSG.get_or_init(|| {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open("/dev/kmsg")
+            .ok()
+    })
+    .as_ref()
 }
 
 fn emit(level: &str, args: Arguments<'_>) {

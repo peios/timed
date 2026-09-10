@@ -20,7 +20,7 @@
 
 use std::net::SocketAddr;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 use rustls::ClientConfig;
 
@@ -31,7 +31,11 @@ use crate::{log, trust};
 /// Something slow to go and do.
 pub enum Job {
     /// Resolve a source's name to addresses.
-    Resolve { index: usize, host: String, port: u16 },
+    Resolve {
+        index: usize,
+        host: String,
+        port: u16,
+    },
     /// Run NTS-KE, and resolve the NTP server the KE server names if it
     /// names a different one. Both halves happen here because the second
     /// is only known once the first has finished, and splitting them
@@ -49,7 +53,10 @@ pub enum Job {
 
 /// What came back.
 pub enum Done {
-    Resolved { index: usize, result: Result<Resolved, String> },
+    Resolved {
+        index: usize,
+        result: Result<Resolved, String>,
+    },
     Handshook {
         index: usize,
         /// The session, and the addresses to actually send NTP to.
@@ -76,7 +83,11 @@ impl Worker {
             .name("timed-net".into())
             .spawn(move || run(job_rx, done_tx))
             .expect("the worker thread starts");
-        Worker { jobs: job_tx, done: done_rx, outstanding: 0 }
+        Worker {
+            jobs: job_tx,
+            done: done_rx,
+            outstanding: 0,
+        }
     }
 
     pub fn submit(&mut self, job: Job) {
@@ -129,9 +140,16 @@ fn run(jobs: Receiver<Job>, done: Sender<Done>) {
                     .map_err(|e| e.to_string());
                 Done::Resolved { index, result }
             }
-            Job::Handshake { index, host, canonical, ke_addresses, tls } => {
-                Done::Handshook { index, result: handshake(&host, &canonical, &ke_addresses, &tls) }
-            }
+            Job::Handshake {
+                index,
+                host,
+                canonical,
+                ke_addresses,
+                tls,
+            } => Done::Handshook {
+                index,
+                result: handshake(&host, &canonical, &ke_addresses, &tls),
+            },
             Job::Roots => Done::Roots(trust::roots().and_then(nts_ke::tls_config)),
         };
         if done.send(result).is_err() {
@@ -171,8 +189,9 @@ fn handshake(
                 Err(_) => match resolve::lookup(named) {
                     Ok(r) => resolve::socket_addrs(&r, established.negotiated.port),
                     Err(e) => {
-                        last =
-                            Some(format!("the KE server named {named}, which does not resolve ({e})"));
+                        last = Some(format!(
+                            "the KE server named {named}, which does not resolve ({e})"
+                        ));
                         continue;
                     }
                 },

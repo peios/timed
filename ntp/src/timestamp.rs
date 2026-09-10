@@ -163,7 +163,11 @@ impl core::ops::Sub for NtpDuration {
 impl core::ops::Div<i64> for NtpDuration {
     type Output = NtpDuration;
     fn div(self, rhs: i64) -> NtpDuration {
-        if rhs == 0 { NtpDuration::ZERO } else { NtpDuration(self.0 / rhs) }
+        if rhs == 0 {
+            NtpDuration::ZERO
+        } else {
+            NtpDuration(self.0 / rhs)
+        }
     }
 }
 
@@ -185,7 +189,11 @@ impl NtpShort {
             return NtpShort(0);
         }
         let scaled = seconds * 65536.0;
-        NtpShort(if scaled >= u32::MAX as f64 { u32::MAX } else { scaled as u32 })
+        NtpShort(if scaled >= u32::MAX as f64 {
+            u32::MAX
+        } else {
+            scaled as u32
+        })
     }
 
     pub fn as_seconds_f64(self) -> f64 {
@@ -204,7 +212,10 @@ mod tests {
     #[test]
     fn the_unix_epoch_is_where_rfc_5905_says() {
         // 1970-01-01 is 2 208 988 800 seconds into era 0.
-        assert_eq!(NtpTimestamp::from_unix(0, 0).seconds(), UNIX_TO_NTP_ERA0 as u32);
+        assert_eq!(
+            NtpTimestamp::from_unix(0, 0).seconds(),
+            UNIX_TO_NTP_ERA0 as u32
+        );
     }
 
     #[test]
@@ -235,13 +246,22 @@ mod tests {
         let d = NtpDuration::from_seconds_f64(-1.25);
         assert_eq!(d.whole_seconds(), -2);
         assert!(d.subsec_nanos().abs_diff(750_000_000) <= 1);
-        assert_eq!(d.whole_seconds() as f64 + d.subsec_nanos() as f64 / 1e9, -1.25);
+        assert_eq!(
+            d.whole_seconds() as f64 + d.subsec_nanos() as f64 / 1e9,
+            -1.25
+        );
     }
 
     #[test]
     fn absurd_floats_saturate_rather_than_wrap() {
-        assert_eq!(NtpDuration::from_seconds_f64(f64::INFINITY), NtpDuration(i64::MAX));
-        assert_eq!(NtpDuration::from_seconds_f64(f64::NEG_INFINITY), NtpDuration(i64::MIN));
+        assert_eq!(
+            NtpDuration::from_seconds_f64(f64::INFINITY),
+            NtpDuration(i64::MAX)
+        );
+        assert_eq!(
+            NtpDuration::from_seconds_f64(f64::NEG_INFINITY),
+            NtpDuration(i64::MIN)
+        );
         assert_eq!(NtpDuration::from_seconds_f64(f64::NAN), NtpDuration::ZERO);
         assert_eq!(NtpShort::from_seconds_f64(1e30), NtpShort(u32::MAX));
     }

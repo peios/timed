@@ -37,7 +37,13 @@ pub struct NetdLink {
 
 impl NetdLink {
     pub fn new(now: Instant) -> NetdLink {
-        NetdLink { stream: None, buf: Vec::new(), next_try: now, backoff: MIN_BACKOFF, warned: false }
+        NetdLink {
+            stream: None,
+            buf: Vec::new(),
+            next_try: now,
+            backoff: MIN_BACKOFF,
+            warned: false,
+        }
     }
 
     pub fn connected(&self) -> bool {
@@ -49,7 +55,11 @@ impl NetdLink {
     }
 
     pub fn next_deadline(&self) -> Option<Instant> {
-        if self.stream.is_none() { Some(self.next_try) } else { None }
+        if self.stream.is_none() {
+            Some(self.next_try)
+        } else {
+            None
+        }
     }
 
     /// Connect if it is time to.
@@ -79,7 +89,8 @@ impl NetdLink {
     fn connect(&self) -> io::Result<UnixStream> {
         let mut stream = UnixStream::connect(CONTROL_SOCKET_PATH)?;
         stream.set_write_timeout(Some(Duration::from_secs(2)))?;
-        libnetd::send(&mut stream, &Request::Subscribe.encode()).map_err(|e| io::Error::other(e.to_string()))?;
+        libnetd::send(&mut stream, &Request::Subscribe.encode())
+            .map_err(|e| io::Error::other(e.to_string()))?;
         stream.set_nonblocking(true)?;
         Ok(stream)
     }
@@ -87,7 +98,9 @@ impl NetdLink {
     /// Read what netd sent. Returns every complete snapshot; on EOF or
     /// error the connection is dropped and a reconnect scheduled.
     pub fn service(&mut self, now: Instant) -> Vec<Snapshot> {
-        let Some(stream) = self.stream.as_mut() else { return Vec::new() };
+        let Some(stream) = self.stream.as_mut() else {
+            return Vec::new();
+        };
         let mut chunk = [0u8; 8192];
         let mut lost = false;
         loop {
@@ -110,7 +123,8 @@ impl NetdLink {
             if self.buf.len() < 4 {
                 break;
             }
-            let len = u32::from_le_bytes([self.buf[0], self.buf[1], self.buf[2], self.buf[3]]) as usize;
+            let len =
+                u32::from_le_bytes([self.buf[0], self.buf[1], self.buf[2], self.buf[3]]) as usize;
             if len > MAX_MESSAGE_BYTES {
                 lost = true;
                 break;

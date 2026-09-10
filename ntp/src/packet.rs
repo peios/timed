@@ -4,9 +4,9 @@
 //! fixed part has no length field anywhere in it, which makes it pleasant to
 //! parse and means the only bound that matters is the buffer's own.
 
+use crate::WireError;
 use crate::extension::ExtensionField;
 use crate::timestamp::{NtpShort, NtpTimestamp};
-use crate::WireError;
 
 /// The NTP version this client speaks and the only one it accepts back.
 pub const VERSION: u8 = 4;
@@ -114,7 +114,10 @@ impl ReferenceId {
     /// printable ASCII. Returned as a fixed array rather than a `&str` so
     /// that reading it cannot fail and cannot allocate.
     pub fn kiss_code(self) -> Option<[u8; 4]> {
-        self.0.iter().all(|b| b.is_ascii_uppercase()).then_some(self.0)
+        self.0
+            .iter()
+            .all(|b| b.is_ascii_uppercase())
+            .then_some(self.0)
     }
 
     /// "Slow down": the server is rate-limiting us and we must back off.
@@ -217,7 +220,10 @@ impl Packet {
     /// rejected.
     pub fn decode(bytes: &[u8]) -> Result<Packet, WireError> {
         if bytes.len() < HEADER_LEN {
-            return Err(WireError::Truncated { need: HEADER_LEN, have: bytes.len() });
+            return Err(WireError::Truncated {
+                need: HEADER_LEN,
+                have: bytes.len(),
+            });
         }
         if bytes.len() > MAX_PACKET {
             return Err(WireError::BadLength(bytes.len() as u32));
@@ -307,28 +313,38 @@ mod tests {
     #[test]
     fn a_short_datagram_is_truncated_not_padded() {
         let bytes = [0u8; HEADER_LEN - 1];
-        assert!(matches!(Packet::decode(&bytes), Err(WireError::Truncated { .. })));
+        assert!(matches!(
+            Packet::decode(&bytes),
+            Err(WireError::Truncated { .. })
+        ));
     }
 
     #[test]
     fn an_enormous_datagram_is_refused_before_it_is_walked() {
         let bytes = vec![0u8; MAX_PACKET + 1];
-        assert!(matches!(Packet::decode(&bytes), Err(WireError::BadLength(_))));
+        assert!(matches!(
+            Packet::decode(&bytes),
+            Err(WireError::BadLength(_))
+        ));
     }
 
     #[test]
     fn a_kiss_of_death_is_recognised_and_carries_no_time() {
-        let mut packet = Packet::default();
-        packet.stratum = 0;
-        packet.reference_id = ReferenceId::RATE;
+        let packet = Packet {
+            stratum: 0,
+            reference_id: ReferenceId::RATE,
+            ..Packet::default()
+        };
         assert!(packet.is_kiss_of_death());
         assert_eq!(packet.reference_id.to_string(), "RATE");
 
         // A stratum-2 server whose upstream happens to be 82.65.84.69 must
         // not be read as a kiss: the stratum is what distinguishes them.
-        let mut server = Packet::default();
-        server.stratum = 2;
-        server.reference_id = ReferenceId::RATE;
+        let server = Packet {
+            stratum: 2,
+            reference_id: ReferenceId::RATE,
+            ..Packet::default()
+        };
         assert!(!server.is_kiss_of_death());
     }
 

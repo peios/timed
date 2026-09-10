@@ -24,8 +24,8 @@
 use aes_siv::aead::{Aead, KeyInit, Payload};
 use aes_siv::{Aes128SivAead, Nonce};
 
-use crate::extension::{ExtensionField, NTS_AUTHENTICATOR};
 use crate::WireError;
+use crate::extension::{ExtensionField, NTS_AUTHENTICATOR};
 
 /// The protocol id NTS-KE negotiates for us: NTPv4. RFC 8915 §7.2.
 pub const NEXT_PROTO_NTPV4: u16 = 0;
@@ -146,7 +146,11 @@ pub const MAX_KE_MESSAGE: usize = 65536;
 
 impl Record {
     pub fn new(critical: bool, record_type: u16, body: impl Into<Vec<u8>>) -> Record {
-        Record { critical, record_type, body: body.into() }
+        Record {
+            critical,
+            record_type,
+            body: body.into(),
+        }
     }
 
     pub fn encode_into(&self, out: &mut Vec<u8>) {
@@ -201,10 +205,16 @@ impl Record {
     /// The body read as a sequence of 16-bit values, which is the shape of
     /// the next-protocol and AEAD-algorithm records.
     pub fn body_as_u16s(&self) -> Result<Vec<u16>, WireError> {
-        if self.body.len() % 2 != 0 {
+        if !self.body.len().is_multiple_of(2) {
             return Err(WireError::BadLength(self.body.len() as u32));
         }
-        Ok(self.body.chunks_exact(2).map(|c| u16::from_be_bytes([c[0], c[1]])).collect())
+        Ok(self
+            .body
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect())
     }
 
     /// The body read as a single 16-bit value: the port and error records.
@@ -223,10 +233,18 @@ impl Record {
 /// nothing to be told "no" about.
 pub fn client_request() -> Vec<u8> {
     let mut out = Vec::new();
-    Record::new(true, record_type::NEXT_PROTOCOL, NEXT_PROTO_NTPV4.to_be_bytes().to_vec())
-        .encode_into(&mut out);
-    Record::new(true, record_type::AEAD_ALGORITHM, AEAD_AES_SIV_CMAC_256.to_be_bytes().to_vec())
-        .encode_into(&mut out);
+    Record::new(
+        true,
+        record_type::NEXT_PROTOCOL,
+        NEXT_PROTO_NTPV4.to_be_bytes().to_vec(),
+    )
+    .encode_into(&mut out);
+    Record::new(
+        true,
+        record_type::AEAD_ALGORITHM,
+        AEAD_AES_SIV_CMAC_256.to_be_bytes().to_vec(),
+    )
+    .encode_into(&mut out);
     Record::new(true, record_type::END_OF_MESSAGE, Vec::new()).encode_into(&mut out);
     out
 }
@@ -301,7 +319,10 @@ pub const COOKIE_TARGET: usize = 8;
 
 /// Interpret a complete KE response.
 pub fn interpret(records: &[Record]) -> Result<Negotiated, KeError> {
-    let mut out = Negotiated { port: DEFAULT_NTP_PORT, ..Negotiated::default() };
+    let mut out = Negotiated {
+        port: DEFAULT_NTP_PORT,
+        ..Negotiated::default()
+    };
     let mut agreed_protocol = false;
     let mut agreed_aead = false;
 
@@ -320,7 +341,9 @@ pub fn interpret(records: &[Record]) -> Result<Negotiated, KeError> {
             }
             record_type::NEW_COOKIE => {
                 if record.body.is_empty() || record.body.len() > MAX_COOKIE {
-                    return Err(KeError::Wire(WireError::BadLength(record.body.len() as u32)));
+                    return Err(KeError::Wire(
+                        WireError::BadLength(record.body.len() as u32),
+                    ));
                 }
                 if out.cookies.len() < COOKIE_TARGET {
                     out.cookies.push(record.body.clone());
@@ -379,7 +402,9 @@ fn is_plausible_host(name: &str) -> bool {
         && name.split('.').all(|label| {
             !label.is_empty()
                 && label.len() <= 63
-                && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
         })
 }
 
@@ -405,7 +430,13 @@ pub fn seal_authenticator(
 ) -> Result<ExtensionField, WireError> {
     let cipher = Aes128SivAead::new(key.into());
     let ciphertext = cipher
-        .encrypt(&Nonce::from(*nonce), Payload { msg: plaintext, aad: prefix })
+        .encrypt(
+            &Nonce::from(*nonce),
+            Payload {
+                msg: plaintext,
+                aad: prefix,
+            },
+        )
         .map_err(|_| WireError::NotAuthentic)?;
 
     let mut value = Vec::with_capacity(4 + NONCE_LEN + ciphertext.len() + 8);
@@ -441,7 +472,10 @@ pub fn open_authenticator(
         return Err(WireError::BadLength(authenticator_at as u32));
     }
     if field_value.len() < 4 {
-        return Err(WireError::Truncated { need: 4, have: field_value.len() });
+        return Err(WireError::Truncated {
+            need: 4,
+            have: field_value.len(),
+        });
     }
     let nonce_len = u16::from_be_bytes([field_value[0], field_value[1]]) as usize;
     let ct_len = u16::from_be_bytes([field_value[2], field_value[3]]) as usize;
@@ -462,7 +496,10 @@ pub fn open_authenticator(
     cipher
         .decrypt(
             &Nonce::try_from(nonce).map_err(|_| WireError::BadLength(nonce_len as u32))?,
-            Payload { msg: ciphertext, aad: &whole[..authenticator_at] },
+            Payload {
+                msg: ciphertext,
+                aad: &whole[..authenticator_at],
+            },
         )
         .map_err(|_| WireError::NotAuthentic)
 }
@@ -510,13 +547,24 @@ mod tests {
     #[test]
     fn an_unknown_critical_record_is_fatal_and_a_known_one_is_not() {
         let mut records = vec![
-            Record::new(true, record_type::NEXT_PROTOCOL, 0u16.to_be_bytes().to_vec()),
-            Record::new(true, record_type::AEAD_ALGORITHM, 15u16.to_be_bytes().to_vec()),
+            Record::new(
+                true,
+                record_type::NEXT_PROTOCOL,
+                0u16.to_be_bytes().to_vec(),
+            ),
+            Record::new(
+                true,
+                record_type::AEAD_ALGORITHM,
+                15u16.to_be_bytes().to_vec(),
+            ),
             Record::new(false, record_type::NEW_COOKIE, vec![9; 100]),
             Record::new(false, 0x4242, vec![1, 2, 3]),
             Record::new(true, record_type::END_OF_MESSAGE, vec![]),
         ];
-        assert!(interpret(&records).is_ok(), "a non-critical unknown is skipped");
+        assert!(
+            interpret(&records).is_ok(),
+            "a non-critical unknown is skipped"
+        );
 
         records[3].critical = true;
         assert_eq!(interpret(&records), Err(KeError::UnknownCritical(0x4242)));
@@ -528,28 +576,54 @@ mod tests {
         let end = Record::new(true, record_type::END_OF_MESSAGE, vec![]);
 
         let no_aead = vec![
-            Record::new(true, record_type::NEXT_PROTOCOL, 0u16.to_be_bytes().to_vec()),
+            Record::new(
+                true,
+                record_type::NEXT_PROTOCOL,
+                0u16.to_be_bytes().to_vec(),
+            ),
             cookie.clone(),
             end.clone(),
         ];
-        assert_eq!(interpret(&no_aead), Err(KeError::NoAgreement("AEAD algorithm")));
+        assert_eq!(
+            interpret(&no_aead),
+            Err(KeError::NoAgreement("AEAD algorithm"))
+        );
 
         // A server that agrees to an AEAD we did not offer is refused, not
         // silently taken as agreement.
         let wrong_aead = vec![
-            Record::new(true, record_type::NEXT_PROTOCOL, 0u16.to_be_bytes().to_vec()),
-            Record::new(true, record_type::AEAD_ALGORITHM, 17u16.to_be_bytes().to_vec()),
+            Record::new(
+                true,
+                record_type::NEXT_PROTOCOL,
+                0u16.to_be_bytes().to_vec(),
+            ),
+            Record::new(
+                true,
+                record_type::AEAD_ALGORITHM,
+                17u16.to_be_bytes().to_vec(),
+            ),
             cookie,
             end,
         ];
-        assert_eq!(interpret(&wrong_aead), Err(KeError::NoAgreement("AEAD algorithm")));
+        assert_eq!(
+            interpret(&wrong_aead),
+            Err(KeError::NoAgreement("AEAD algorithm"))
+        );
     }
 
     #[test]
     fn cookies_are_bounded_in_size_and_number() {
         let mut records = vec![
-            Record::new(true, record_type::NEXT_PROTOCOL, 0u16.to_be_bytes().to_vec()),
-            Record::new(true, record_type::AEAD_ALGORITHM, 15u16.to_be_bytes().to_vec()),
+            Record::new(
+                true,
+                record_type::NEXT_PROTOCOL,
+                0u16.to_be_bytes().to_vec(),
+            ),
+            Record::new(
+                true,
+                record_type::AEAD_ALGORITHM,
+                15u16.to_be_bytes().to_vec(),
+            ),
         ];
         for _ in 0..50 {
             records.push(Record::new(false, record_type::NEW_COOKIE, vec![1; 100]));
@@ -558,15 +632,26 @@ mod tests {
         assert_eq!(interpret(&records).unwrap().cookies.len(), COOKIE_TARGET);
 
         records[2] = Record::new(false, record_type::NEW_COOKIE, vec![1; MAX_COOKIE + 1]);
-        assert!(matches!(interpret(&records), Err(KeError::Wire(WireError::BadLength(_)))));
+        assert!(matches!(
+            interpret(&records),
+            Err(KeError::Wire(WireError::BadLength(_)))
+        ));
     }
 
     #[test]
     fn a_redirect_to_something_that_is_not_a_host_is_refused() {
         let ok = |body: &[u8]| {
             let records = vec![
-                Record::new(true, record_type::NEXT_PROTOCOL, 0u16.to_be_bytes().to_vec()),
-                Record::new(true, record_type::AEAD_ALGORITHM, 15u16.to_be_bytes().to_vec()),
+                Record::new(
+                    true,
+                    record_type::NEXT_PROTOCOL,
+                    0u16.to_be_bytes().to_vec(),
+                ),
+                Record::new(
+                    true,
+                    record_type::AEAD_ALGORITHM,
+                    15u16.to_be_bytes().to_vec(),
+                ),
                 Record::new(false, record_type::NEW_COOKIE, vec![9; 100]),
                 Record::new(false, record_type::SERVER, body.to_vec()),
                 Record::new(true, record_type::END_OF_MESSAGE, vec![]),
@@ -624,7 +709,10 @@ mod tests {
 
     #[test]
     fn keys_do_not_print_themselves() {
-        let keys = Keys { c2s: [1; KEY_LEN], s2c: [2; KEY_LEN] };
+        let keys = Keys {
+            c2s: [1; KEY_LEN],
+            s2c: [2; KEY_LEN],
+        };
         assert_eq!(format!("{keys:?}"), "Keys(<redacted>)");
     }
 }

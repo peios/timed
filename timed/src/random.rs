@@ -36,7 +36,10 @@ pub fn fill(buffer: &mut [u8]) -> io::Result<()> {
             return Err(error);
         }
         if n == 0 {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "getrandom returned nothing"));
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "getrandom returned nothing",
+            ));
         }
         filled += n as usize;
     }

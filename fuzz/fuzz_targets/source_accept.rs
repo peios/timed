@@ -12,7 +12,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use ntp::NtpTimestamp;
-use timed::source::{Security, Source, DEFAULT_MAX_POLL, DEFAULT_MIN_POLL};
+use timed::source::{DEFAULT_MAX_POLL, DEFAULT_MIN_POLL, Security, Source};
 
 fuzz_target!(|data: &[u8]| {
     let address = "192.0.2.1:123".parse().unwrap();
@@ -24,7 +24,9 @@ fuzz_target!(|data: &[u8]| {
         DEFAULT_MAX_POLL,
     );
     let wall = NtpTimestamp::from_unix(1_756_000_000, 0);
-    let Ok(request) = source.prepare(wall, 0.0) else { return };
+    let Ok(request) = source.prepare(wall, 0.0) else {
+        return;
+    };
     let sent = ntp::Packet::decode(&request).unwrap().transmit_timestamp;
 
     let destination = NtpTimestamp::from_unix(1_756_000_000, 50_000_000);
@@ -35,8 +37,17 @@ fuzz_target!(|data: &[u8]| {
     // practice this is always false — which is the point.
     let echoed = ntp::Packet::decode(data).is_ok_and(|p| p.origin_timestamp == sent);
     if !echoed {
-        assert!(result.is_err(), "a reply that did not echo our nonce was accepted");
-        assert_eq!(source.reach, 0, "a forged reply marked the source reachable");
-        assert!(source.filter.is_empty(), "a forged reply reached the filter");
+        assert!(
+            result.is_err(),
+            "a reply that did not echo our nonce was accepted"
+        );
+        assert_eq!(
+            source.reach, 0,
+            "a forged reply marked the source reachable"
+        );
+        assert!(
+            source.filter.is_empty(),
+            "a forged reply reached the filter"
+        );
     }
 });

@@ -422,7 +422,10 @@ pub enum Reply {
     Ok,
     Error(String),
     Status(Status),
-    Sources { sources: Vec<SourceInfo>, more: bool },
+    Sources {
+        sources: Vec<SourceInfo>,
+        more: bool,
+    },
     Snapshot(Snapshot),
 }
 
@@ -448,7 +451,8 @@ impl Reply {
                 w.write_str("jitter").write_float(s.jitter);
                 w.write_str("root_distance").write_float(s.root_distance);
                 w.write_str("root_delay").write_float(s.root_delay);
-                w.write_str("root_dispersion").write_float(s.root_dispersion);
+                w.write_str("root_dispersion")
+                    .write_float(s.root_dispersion);
                 w.write_str("leap").write_int(s.leap as i64);
                 w.write_str("stepped").write_float(s.stepped);
                 w.write_str("updates").write_uint(s.updates);
@@ -473,7 +477,8 @@ impl Reply {
                 w.write_str("reference_id").write_bin(&s.reference_id);
                 w.write_str("reference_time").write_float(s.reference_time);
                 w.write_str("root_delay").write_float(s.root_delay);
-                w.write_str("root_dispersion").write_float(s.root_dispersion);
+                w.write_str("root_dispersion")
+                    .write_float(s.root_dispersion);
                 w.write_str("precision").write_int(s.precision as i64);
                 w.write_str("at").write_float(s.at);
                 w.write_str("synchronised").write_bool(s.synchronised);
@@ -780,7 +785,12 @@ mod tests {
 
     #[test]
     fn requests_round_trip_and_carry_the_right_they_need() {
-        for req in [Request::Status, Request::Sources, Request::Subscribe, Request::Reload] {
+        for req in [
+            Request::Status,
+            Request::Sources,
+            Request::Subscribe,
+            Request::Reload,
+        ] {
             assert_eq!(Request::decode(&req.encode()).unwrap(), req);
         }
         assert_eq!(Request::Reload.required_right(), TIME_CONTROL);
@@ -812,22 +822,37 @@ mod tests {
         assert_eq!(Reply::decode(&reply.encode()).unwrap(), reply);
 
         // And with nothing selected, which is the interesting case.
-        let empty = Reply::Status(Status { sync: Sync::Unsynchronised, ..Status::default() });
+        let empty = Reply::Status(Status {
+            sync: Sync::Unsynchronised,
+            ..Status::default()
+        });
         assert_eq!(Reply::decode(&empty.encode()).unwrap(), empty);
     }
 
     #[test]
     fn sources_round_trip_and_reassemble() {
-        let reply = Reply::Sources { sources: (0..3).map(source).collect(), more: true };
+        let reply = Reply::Sources {
+            sources: (0..3).map(source).collect(),
+            more: true,
+        };
         assert_eq!(Reply::decode(&reply.encode()).unwrap(), reply);
 
         let all = sources_of(vec![
-            Reply::Sources { sources: vec![source(0), source(1)], more: true },
-            Reply::Sources { sources: vec![source(2)], more: false },
+            Reply::Sources {
+                sources: vec![source(0), source(1)],
+                more: true,
+            },
+            Reply::Sources {
+                sources: vec![source(2)],
+                more: false,
+            },
         ])
         .unwrap();
         assert_eq!(all.len(), 3);
-        assert_eq!(sources_of(vec![Reply::Error("denied".into())]), Err("denied".into()));
+        assert_eq!(
+            sources_of(vec![Reply::Error("denied".into())]),
+            Err("denied".into())
+        );
     }
 
     #[test]
@@ -867,9 +892,16 @@ mod tests {
     #[test]
     fn a_full_chunk_fits_the_ceiling() {
         let big: Vec<SourceInfo> = (0..SOURCES_PER_CHUNK as u8)
-            .map(|n| SourceInfo { name: "x".repeat(253), ..source(n) })
+            .map(|n| SourceInfo {
+                name: "x".repeat(253),
+                ..source(n)
+            })
             .collect();
-        let bytes = Reply::Sources { sources: big, more: true }.encode();
+        let bytes = Reply::Sources {
+            sources: big,
+            more: true,
+        }
+        .encode();
         assert!(bytes.len() <= MAX_MESSAGE_BYTES, "{} bytes", bytes.len());
         let mut buf = Vec::new();
         send(&mut buf, &bytes).unwrap();
@@ -879,12 +911,26 @@ mod tests {
     #[test]
     fn a_duplicate_key_is_refused_and_an_unknown_one_ignored() {
         let mut w = Writer::new();
-        w.write_map(2).write_str("query").write_str("status").write_str("query").write_str("status");
-        assert!(matches!(Request::decode(&w.to_bytes().unwrap()), Err(WireError::Duplicate(_))));
+        w.write_map(2)
+            .write_str("query")
+            .write_str("status")
+            .write_str("query")
+            .write_str("status");
+        assert!(matches!(
+            Request::decode(&w.to_bytes().unwrap()),
+            Err(WireError::Duplicate(_))
+        ));
 
         let mut w = Writer::new();
-        w.write_map(2).write_str("extra").write_uint(3).write_str("query").write_str("status");
-        assert_eq!(Request::decode(&w.to_bytes().unwrap()).unwrap(), Request::Status);
+        w.write_map(2)
+            .write_str("extra")
+            .write_uint(3)
+            .write_str("query")
+            .write_str("status");
+        assert_eq!(
+            Request::decode(&w.to_bytes().unwrap()).unwrap(),
+            Request::Status
+        );
     }
 
     #[test]

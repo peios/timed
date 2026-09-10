@@ -114,7 +114,9 @@ impl Exchange {
         // number by wrapping — but a server whose processing time exceeds
         // our round trip (impossible physically, trivial to claim) would
         // make it negative, which the floor below absorbs.
-        let delay = (round_trip - server_held).as_seconds_f64().max(MIN_DISPERSION);
+        let delay = (round_trip - server_held)
+            .as_seconds_f64()
+            .max(MIN_DISPERSION);
         if delay > max_delay {
             return Err(SampleError::TooFar { delay });
         }
@@ -131,7 +133,12 @@ impl Exchange {
             + log2_seconds(server_precision)
             + PHI * round_trip.as_seconds_f64();
 
-        Ok(Sample { offset, delay, dispersion, at })
+        Ok(Sample {
+            offset,
+            delay,
+            dispersion,
+            at,
+        })
     }
 }
 
@@ -161,13 +168,20 @@ mod tests {
                 (s.fract().abs() * 1e9) as u32,
             )
         };
-        Exchange { origin: ts(t1), receive: ts(t2), transmit: ts(t3), destination: ts(t4) }
+        Exchange {
+            origin: ts(t1),
+            receive: ts(t2),
+            transmit: ts(t3),
+            destination: ts(t4),
+        }
     }
 
     #[test]
     fn a_symmetric_exchange_with_no_error_has_no_offset() {
         // Out at 0, arrives at 0.05, replied at 0.05, back at 0.1.
-        let s = exchange(0.0, 0.05, 0.05, 0.1).reduce(-20, -20, 1.0, 0.0).unwrap();
+        let s = exchange(0.0, 0.05, 0.05, 0.1)
+            .reduce(-20, -20, 1.0, 0.0)
+            .unwrap();
         assert!(s.offset.abs() < 1e-6, "offset {}", s.offset);
         assert!((s.delay - 0.1).abs() < 1e-6, "delay {}", s.delay);
     }
@@ -175,7 +189,9 @@ mod tests {
     #[test]
     fn a_slow_local_clock_shows_a_positive_offset() {
         // The server is one second ahead of us: its timestamps are +1.
-        let s = exchange(0.0, 1.05, 1.05, 0.1).reduce(-20, -20, 1.0, 0.0).unwrap();
+        let s = exchange(0.0, 1.05, 1.05, 0.1)
+            .reduce(-20, -20, 1.0, 0.0)
+            .unwrap();
         assert!((s.offset - 1.0).abs() < 1e-6, "offset {}", s.offset);
         assert!((s.delay - 0.1).abs() < 1e-6, "delay {}", s.delay);
     }
@@ -183,7 +199,9 @@ mod tests {
     #[test]
     fn the_server_thinking_for_a_while_does_not_count_as_delay() {
         // Round trip a second, but the server held the request for 0.9 of it.
-        let s = exchange(0.0, 0.05, 0.95, 1.0).reduce(-20, -20, 1.0, 0.0).unwrap();
+        let s = exchange(0.0, 0.05, 0.95, 1.0)
+            .reduce(-20, -20, 1.0, 0.0)
+            .unwrap();
         assert!((s.delay - 0.1).abs() < 1e-6, "delay {}", s.delay);
     }
 
@@ -192,7 +210,9 @@ mod tests {
         // The property that bounds how much damage a path attacker can do,
         // stated as a test so that it cannot quietly stop being true.
         // Outbound 0.1s, inbound 0.5s: total delay 0.6, asymmetry 0.4.
-        let s = exchange(0.0, 0.1, 0.1, 0.6).reduce(-20, -20, 2.0, 0.0).unwrap();
+        let s = exchange(0.0, 0.1, 0.1, 0.6)
+            .reduce(-20, -20, 2.0, 0.0)
+            .unwrap();
         assert!((s.offset - (-0.2)).abs() < 1e-6, "offset {}", s.offset);
         assert!((s.offset.abs() - s.delay / 2.0 + 0.1).abs() < 1e-6);
     }
@@ -200,30 +220,46 @@ mod tests {
     #[test]
     fn a_local_clock_that_jumped_backwards_invalidates_the_measurement() {
         let e = exchange(1.0, 0.5, 0.5, 0.0);
-        assert_eq!(e.reduce(-20, -20, 1.0, 0.0), Err(SampleError::LocalWentBackwards));
+        assert_eq!(
+            e.reduce(-20, -20, 1.0, 0.0),
+            Err(SampleError::LocalWentBackwards)
+        );
     }
 
     #[test]
     fn a_server_that_replied_before_it_asked_is_refused() {
         let e = exchange(0.0, 0.5, 0.1, 1.0);
-        assert_eq!(e.reduce(-20, -20, 1.0, 0.0), Err(SampleError::ServerWentBackwards));
+        assert_eq!(
+            e.reduce(-20, -20, 1.0, 0.0),
+            Err(SampleError::ServerWentBackwards)
+        );
     }
 
     #[test]
     fn a_delay_past_the_limit_is_refused_rather_than_weighted_down() {
         let e = exchange(0.0, 0.5, 0.5, 1.0);
-        assert!(matches!(e.reduce(-20, -20, 0.5, 0.0), Err(SampleError::TooFar { .. })));
+        assert!(matches!(
+            e.reduce(-20, -20, 0.5, 0.0),
+            Err(SampleError::TooFar { .. })
+        ));
     }
 
     #[test]
     fn an_absurd_precision_claim_cannot_produce_an_infinity() {
-        let s = exchange(0.0, 0.05, 0.05, 0.1).reduce(127, 127, 1.0, 0.0).unwrap();
+        let s = exchange(0.0, 0.05, 0.05, 0.1)
+            .reduce(127, 127, 1.0, 0.0)
+            .unwrap();
         assert!(s.dispersion.is_finite(), "{}", s.dispersion);
     }
 
     #[test]
     fn dispersion_grows_with_age_at_phi() {
-        let s = Sample { offset: 0.0, delay: 0.01, dispersion: 0.001, at: 100.0 };
+        let s = Sample {
+            offset: 0.0,
+            delay: 0.01,
+            dispersion: 0.001,
+            at: 100.0,
+        };
         assert!((s.aged_dispersion(1100.0) - (0.001 + PHI * 1000.0)).abs() < 1e-12);
         // Never shrinks, even if asked about a time before it was taken.
         assert_eq!(s.aged_dispersion(0.0), 0.001);

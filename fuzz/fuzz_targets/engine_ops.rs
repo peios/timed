@@ -21,7 +21,13 @@ use timed::select::{self, Candidate};
 #[derive(Arbitrary, Debug)]
 enum Op {
     /// A measurement arrives for one source.
-    Sample { source: u8, offset: f32, delay: f32, dispersion: f32, at: u16 },
+    Sample {
+        source: u8,
+        offset: f32,
+        delay: f32,
+        dispersion: f32,
+        at: u16,
+    },
     /// A source goes quiet.
     Reset { source: u8 },
     /// Run selection over whatever the filters hold.
@@ -40,7 +46,13 @@ fuzz_target!(|ops: Vec<Op>| {
 
     for op in ops.iter().take(512) {
         match op {
-            Op::Sample { source, offset, delay, dispersion, at } => {
+            Op::Sample {
+                source,
+                offset,
+                delay,
+                dispersion,
+                at,
+            } => {
                 let sample = Sample {
                     offset: *offset as f64,
                     delay: (*delay as f64).abs(),
@@ -76,7 +88,11 @@ fuzz_target!(|ops: Vec<Op>| {
                     })
                     .collect();
                 if let Ok(selection) = select::select(&candidates, now) {
-                    assert!(selection.offset.is_finite(), "selection produced {}", selection.offset);
+                    assert!(
+                        selection.offset.is_finite(),
+                        "selection produced {}",
+                        selection.offset
+                    );
                     assert!(selection.jitter.is_finite(), "jitter {}", selection.jitter);
                     assert!(selection.jitter >= 0.0);
                     // A survivor cannot also be a falseticker; the two

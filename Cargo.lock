@@ -304,7 +304,8 @@ dependencies = [
 
 [[package]]
 name = "libnetd"
-version = "0.1.0"
+version = "0.1.1"
+source = "git+https://github.com/peios/netd.git?rev=301fdabdeb5ef67fcaa308b9522f9b24aeef4cf4#301fdabdeb5ef67fcaa308b9522f9b24aeef4cf4"
 dependencies = [
  "peios",
 ]
@@ -312,6 +313,7 @@ dependencies = [
 [[package]]
 name = "libresolv"
 version = "0.1.0"
+source = "git+https://github.com/peios/resolvd.git?rev=aea35d430d75cb02aa6fa471734ade959112c85b#aea35d430d75cb02aa6fa471734ade959112c85b"
 
 [[package]]
 name = "libtimed"
@@ -323,6 +325,7 @@ dependencies = [
 [[package]]
 name = "libtrust"
 version = "0.1.1"
+source = "git+https://github.com/peios/trustd.git?rev=0887b819ce63e96e6d27164ee9ca4179784ce222#0887b819ce63e96e6d27164ee9ca4179784ce222"
 dependencies = [
  "peios",
 ]
