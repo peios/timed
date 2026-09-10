@@ -7,11 +7,7 @@ side_effects = ["man-db"]
 name        = "dev.peios.timed"
 description = "Peios authenticated network time synchronisation service"
 
-[provides]
-timed = "{{version}}-1"
 
-[replaces]
-timed = "<= 0.1.0-8"
 
 [dependencies]
 "dev.peios.libpeios" = ">= 0.5.0"
