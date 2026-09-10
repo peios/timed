@@ -1,0 +1,3 @@
+[allow]
+"elf.cet" = "Rust 1.98 does not emit the x86 GNU property note for IBT or shadow-stack compatibility; all C and assembly dependencies retain NX stack and the package keeps full relocation hardening"
+"elf.stripped" = "GNU strip deliberately retains rustc's small allocated .debug_gdb_scripts helper; removing that allocated section with binutils also removes the GNU_RELRO program header, while DWARF and symbols are detached into debuginfo"

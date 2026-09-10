@@ -1,4 +1,4 @@
-# Base metadata for the packages carved from the timed build tree.
+# Base metadata for the production packages carved from the timed build tree.
 #
 #   timed  the time client. Polls authenticated sources, decides which are
 #          telling the truth, and steers the system clock. The only process
@@ -6,7 +6,7 @@
 #   clock  its operator command. Reads over the socket; time policy is
 #          written with reg.
 #
-# Two packages because `clock status` should work on a machine that gets
+# Two runtime packages because `clock status` should work on a machine that gets
 # its time some other way, and because a command every user may run should
 # not drag a privileged daemon in with it.
 #
@@ -20,6 +20,8 @@
 format = "peipkg"
 
 [package]
-version      = "{{version}}-8"
+version      = "{{version}}-1"
 architecture = "x86_64"
-license      = "MIT"
+license      = "MIT AND Apache-2.0 AND ISC AND BSD-3-Clause AND Unicode-3.0"
+license_class = "free"
+homepage      = "https://github.com/peios/timed"

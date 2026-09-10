@@ -1,0 +1,26 @@
+# Keep man-db's search index coherent when the operator manual is installed.
+side_effects = ["man-db"]
+
+# A stateless operator client. It owns no service state and speaks timed's
+# public local protocol, so it can remain installed against another compatible
+# time authority without pulling the privileged daemon package back in.
+[package]
+name        = "dev.peios.clock"
+description = "Operator command for the Peios time client"
+
+[provides]
+clock = "{{version}}-1"
+
+[replaces]
+clock = "<= 0.1.0-8"
+
+[dependencies]
+"dev.peios.libpeios" = ">= 0.5.0"
+"org.gnu.glibc"      = "*"
+"org.gnu.gcc-libgcc" = "*"
+
+[files]
+"@source:LICENSE" = "usr/share/licenses/dev.peios.clock/LICENSE"
+":licenses/**"    = "usr/share/licenses/dev.peios.clock/third-party"
+":usr/bin/clock"  = "usr/bin/clock"
+":usr/share/man/man1/clock.1.gz" = "usr/share/man/man1/clock.1.gz"

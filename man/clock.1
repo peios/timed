@@ -1,0 +1,57 @@
+.TH CLOCK 1 "Peios" "timed 0.1.1" "User Commands"
+.SH NAME
+clock \- inspect and control the Peios time client
+.SH SYNOPSIS
+.B clock
+.RI [ command ]
+.SH DESCRIPTION
+.B clock
+queries the machine-wide
+.BR timed (8)
+service over its local control socket.  With no command it displays the
+current synchronisation status.
+.PP
+Time-source policy is registry configuration under
+.BR Machine\\System\\Time .
+Change it with
+.BR reg (1),
+then ask the daemon to reload it.
+.SH COMMANDS
+.TP
+.B status
+Show synchronisation state, selected peer, offset, frequency, jitter,
+accuracy, update count, and the build-time clock floor.
+.TP
+.B sources
+List configured sources, their authentication and reachability, and their
+part in source selection.
+.TP
+.B reload
+Re-read
+.B Machine\\System\\Time
+and poll immediately.  This operation requires control access to timed's
+control object.
+.TP
+.BR help , " -h" , " --help"
+Show command help.
+.SH EXIT STATUS
+.TP
+.B 0
+The request completed successfully.
+.TP
+.B 1
+The daemon was unavailable or refused the request.
+.TP
+.B 2
+The requested information was absent, for example when no sources are
+configured.
+.TP
+.B 64
+The command line was not understood.
+.SH FILES
+.TP
+.B /run/timed/time.sock
+Local timed control socket.
+.SH SEE ALSO
+.BR timed (8),
+.BR reg (1)
