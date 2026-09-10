@@ -18,7 +18,7 @@ timed = "<= 0.1.0-8"
 "org.gnu.glibc"      = "*"
 "org.gnu.gcc-libgcc" = "*"
 sh                     = "*"
-peiosutils             = "*"
+"dev.peios.peiosutils" = "*"
 
 [files]
 "@source:LICENSE"                         = "usr/share/licenses/dev.peios.timed/LICENSE"
