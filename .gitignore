@@ -1,3 +1,8 @@
 /target
 /out
+/fuzz/target/
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz-*.log
+/fuzz/campaign.txt
 Cargo.lock.orig
