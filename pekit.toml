@@ -230,6 +230,10 @@ gate = true
 needs = ["main", "vendor"]
 command = '''
 set -eu
+SOURCE_DATE_EPOCH=${PEKIT_SOURCE_TIMESTAMP:-}
+case "$SOURCE_DATE_EPOCH" in
+  ''|*[!0-9]*) echo "timed: PEKIT_SOURCE_TIMESTAMP is not an epoch" >&2; exit 1 ;;
+esac
 export CARGO_HOME=$PEKIT_OUT/cargo-home
 mkdir -p "$CARGO_HOME"
 cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
