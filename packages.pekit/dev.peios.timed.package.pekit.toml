@@ -6,6 +6,9 @@ side_effects = ["man-db"]
 [package]
 name        = "dev.peios.timed"
 description = "Peios authenticated network time synchronisation service"
+# The crate closure timed links; build.main's collect-rust-licences --check
+# holds this to what those crates declare.
+license     = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 AND ISC) AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 
 
@@ -18,7 +21,7 @@ sh                     = "*"
 
 [files]
 "@source:LICENSE"                         = "usr/share/licenses/dev.peios.timed/LICENSE"
-":licenses/**"                            = "usr/share/licenses/dev.peios.timed/third-party"
+":licenses/timed/**"                      ="usr/share/licenses/dev.peios.timed/third-party"
 ":usr/sbin/timed"                         = "usr/sbin/timed"
 ":usr/libexec/timed/prepare-state"        = "usr/libexec/timed/prepare-state"
 ":usr/share/regim/timed-service.reg"      = "usr/share/regim/timed-service.reg"
