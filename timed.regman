@@ -167,13 +167,19 @@ to validate a certificate should not need a privilege to find out.
 Only `reload` needs control. Changing the time policy itself is a registry
 write governed by this key's own descriptor, not by this value.
 
---- machine\generic\authn\policy timed
-canonical: Machine\Generic\Authn\Policy\S-1-5-80-...  (timed's service SID)
+--- machine\generic\authn\policy\s-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 privileges
+canonical: Machine\Generic\Authn\Policy\S-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 Privileges
 type: REG_MULTI_SZ
 default: SeSystemtimePrivilege, SeChangeNotifyPrivilege
+valid: privilege names; see the generic page for the vocabulary
 applies: next start
 
 Where timed's authority to set the clock actually comes from.
+
+That SID is timed's, derived — it is the SHA-1 of `TIMED` as UTF-16LE,
+split into five little-endian words after `S-1-5-80`. It is written out in
+full rather than abbreviated so that looking the key up actually finds
+this page instead of authd's generic one.
 
 authd unions the privileges of every SID on a token, and a service token
 carries the `S-1-5-80` SID derived from the service name. A record named
