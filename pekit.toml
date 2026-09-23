@@ -50,6 +50,7 @@ test -n "$(find "$PEKIT_OUT/vendor" -mindepth 1 -maxdepth 1 -type d -print -quit
 "org.mozilla.ca-certificates" = "*"
 "org.gnu.findutils"           = "*"
 "org.python.python3"          = "*"
+"dev.peios.peiosutils"        = "*"
 
 [build.vendor.dependencies.apt]
 cargo           = "*"
