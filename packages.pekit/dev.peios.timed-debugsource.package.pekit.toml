@@ -4,8 +4,8 @@ architecture = "x86_64"
 description  = "Debug sources for timed and clock"
 
 [dependencies]
-"dev.peios.timed-debuginfo" = "= {{version}}-1"
-"dev.peios.clock-debuginfo" = "= {{version}}-1"
+"dev.peios.timed-debuginfo" = "= {{release}}"
+"dev.peios.clock-debuginfo" = "= {{release}}"
 
 [files]
 "@source:LICENSE"   = "usr/share/licenses/dev.peios.timed-debugsource/LICENSE"
