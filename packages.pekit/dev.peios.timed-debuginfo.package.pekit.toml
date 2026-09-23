@@ -3,7 +3,7 @@ name        = "dev.peios.timed-debuginfo"
 description = "Debugging symbols for the Peios time service"
 
 [dependencies]
-"dev.peios.timed" = "= {{version}}-1"
+"dev.peios.timed" = "= {{release}}"
 
 [files]
 "@source:LICENSE"                  = "usr/share/licenses/dev.peios.timed-debuginfo/LICENSE"

@@ -46,7 +46,7 @@ test -n "$(find "$PEKIT_OUT/vendor" -mindepth 1 -maxdepth 1 -type d -print -quit
 '''
 
 [build.vendor.dependencies.peipkg]
-"org.rust-lang.rust"          = ">= 1.98.1, < 2"
+"org.rust-lang.rust"          = ">= 1.98.1"
 "org.mozilla.ca-certificates" = "*"
 "org.gnu.findutils"           = "*"
 "org.python.python3"          = "*"
@@ -75,10 +75,7 @@ done
 
 # Native builds consume the packaged ABI, never an ad-hoc libpeios build.
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
-test "$(pkg-config --modversion peios)" = 0.5.0 || {
-  echo "timed: dev.peios.libpeios-devel 0.5.0 is required" >&2
-  exit 1
-}
+. "$SRC/packaging/check-libpeios.sh"
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 
 # A source tag and all four workspace crates are one release family.
@@ -106,6 +103,9 @@ export SOURCE_DATE_EPOCH
 
 # Stable DWARF names exclude both source and disposable build roots.
 export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$PEKIT_WORKSPACE_ROOT=$DEBUG_PREFIX/.workspace --remap-path-prefix=$PEKIT_OUT_BASE=$DEBUG_PREFIX/.build --remap-path-prefix=$SRC=$DEBUG_PREFIX --remap-path-prefix=$PEKIT_VENDOR_OUT/vendor=$DEBUG_PREFIX/vendor"
+# ring's C and assembly go through cc-rs, which reads CFLAGS rather than
+# RUSTFLAGS; map the vendor tree there too so its DWARF names stay stable.
+export CFLAGS="${CFLAGS:+$CFLAGS }-ffile-prefix-map=$PEKIT_VENDOR_OUT/vendor=$DEBUG_PREFIX/vendor"
 # Control-flow protection (PEI-1155). Peios' libstd is built with LLVM's CET
 # instrumentation (org.rust-lang.rust); stable rustc applies it to other
 # crates only under -Zcf-protection, so every crate here gets ENDBR landing
@@ -195,20 +195,22 @@ test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 
 [build.main.dependencies.peipkg]
 "org.git.kernel.dash"      = "*"
-"org.gnu.coreutils"        = "*"
+"dev.peios.peiosutils"     = "*"
+# GNU install -m for the staged payload.
+"org.gnu.coreutils-build-compat" = "*"
 "org.gnu.diffutils"        = "*"
 "org.gnu.findutils"        = "*"
 "org.gnu.grep"             = "*"
 "org.gnu.sed"              = "*"
 "org.gnu.gzip"             = "*"
-"org.rust-lang.rust"       = ">= 1.98.1, < 2"
-"org.gnu.gcc"              = ">= 16, < 17"
+"org.rust-lang.rust"       = ">= 1.98.1"
+"org.gnu.gcc"              = ">= 16"
 "org.gnu.binutils"         = "*"
 "org.sourceware.debugedit" = "*"
 "org.python.python3"       = "*"
-"org.llvm.clang-devel"     = ">= 22, < 23"
+"org.llvm.clang-devel"     = ">= 22.1.8"
 "org.pkgconf.pkgconf"      = "*"
-"dev.peios.libpeios-devel" = "= 0.5.0-1"
+"dev.peios.libpeios-devel" = ">= 0.5.0"
 
 [test]
 gate = true
@@ -223,8 +225,11 @@ export CARGO_HOME=$PEKIT_OUT/cargo-home
 mkdir -p "$CARGO_HOME"
 cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
-test "$(pkg-config --modversion peios)" = 0.5.0
+. packaging/check-libpeios.sh
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
+# Control-flow protection (PEI-1155): test code is instrumented like build.main.
+export RUSTC_BOOTSTRAP=1
+export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Zcf-protection=full"
 cargo test --release --workspace --locked --offline --target-dir "$PEKIT_OUT/tests"
 
 # Validate the exact staged package output produced by build.main.
@@ -271,37 +276,49 @@ do
   readelf -h "$elf" | grep -Eq 'Type:[[:space:]]+DYN'
   readelf -lW "$elf" | grep -q 'GNU_RELRO'
   readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RW[[:space:]]'
-  ! readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RWE'
+  if readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RWE'; then
+    echo "timed: $component has an executable stack" >&2
+    exit 1
+  fi
   readelf -dW "$elf" | grep -q 'BIND_NOW'
   readelf -dW "$elf" | grep -q 'RELR'
   readelf -dW "$elf" | grep -Eq 'FLAGS_1.*PIE'
   readelf -dW "$elf" | grep -Fq 'Shared library: [libpeios.so.0]'
-  ! readelf -dW "$elf" | grep -Eq '(RPATH|RUNPATH|TEXTREL)'
-  ! readelf -SW "$elf" | grep -q '\.debug_info'
+  if readelf -dW "$elf" | grep -Eq '(RPATH|RUNPATH|TEXTREL)'; then
+    echo "timed: $component has a forbidden dynamic tag" >&2
+    exit 1
+  fi
+  if readelf -SW "$elf" | grep -q '\.debug_info'; then
+    echo "timed: $component still contains unsplit debug information" >&2
+    exit 1
+  fi
   build_id=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
   debug=$PEKIT_OUT/debug/$component/usr/lib/debug/.build-id/$(printf %s "$build_id" | cut -c1-2)/$(printf %s "$build_id" | cut -c3-).debug
   test -s "$debug"
   readelf -SW "$debug" | grep -q '\.debug_info'
   test "$(readelf -n "$debug" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)" = "$build_id"
   for forbidden in "$SRC" "$PEKIT_VENDOR_OUT" "$PEKIT_OUT_BASE" "$PEKIT_WORKSPACE_ROOT"; do
-    ! grep -aF "$forbidden" "$elf" "$debug" >/dev/null
+    if grep -aqF "$forbidden" "$elf" "$debug"; then
+      echo "timed: $component leaks a build path: $forbidden" >&2
+      exit 1
+    fi
   done
 done
 '''
 
 [test.dependencies.peipkg]
 "org.git.kernel.dash"      = "*"
-"org.gnu.coreutils"        = "*"
+"dev.peios.peiosutils"     = "*"
 "org.gnu.diffutils"        = "*"
 "org.gnu.findutils"        = "*"
 "org.gnu.grep"             = "*"
 "org.gnu.sed"              = "*"
 "org.gnu.gzip"             = "*"
-"org.rust-lang.rust"       = ">= 1.98.1, < 2"
-"org.gnu.gcc"              = ">= 16, < 17"
+"org.rust-lang.rust"       = ">= 1.98.1"
+"org.gnu.gcc"              = ">= 16"
 "org.gnu.binutils"         = "*"
 "org.sourceware.debugedit" = "*"
 "org.python.python3"       = "*"
-"org.llvm.clang-devel"     = ">= 22, < 23"
+"org.llvm.clang-devel"     = ">= 22.1.8"
 "org.pkgconf.pkgconf"      = "*"
-"dev.peios.libpeios-devel" = "= 0.5.0-1"
+"dev.peios.libpeios-devel" = ">= 0.5.0"

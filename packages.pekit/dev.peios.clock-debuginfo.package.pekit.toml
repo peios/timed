@@ -3,7 +3,7 @@ name        = "dev.peios.clock-debuginfo"
 description = "Debugging symbols for the Peios time operator command"
 
 [dependencies]
-"dev.peios.clock" = "= {{version}}-1"
+"dev.peios.clock" = "= {{release}}"
 
 [files]
 "@source:LICENSE"                  = "usr/share/licenses/dev.peios.clock-debuginfo/LICENSE"
