@@ -132,13 +132,39 @@ install -m 0644 "$SRC/timed.regman" "$PEKIT_OUT/usr/share/regman/timed.regman"
 gzip -9n < "$SRC/man/clock.1" > "$PEKIT_OUT/usr/share/man/man1/clock.1.gz"
 gzip -9n < "$SRC/man/timed.8" > "$PEKIT_OUT/usr/share/man/man8/timed.8.gz"
 
-# Preserve every licence notice in the locked Linux build graph and record the
-# exact expression declared by each crate. The collector fails closed.
-python3 "$SRC/tools/collect-rust-metadata.py" --licence-root "$LICENSE_ROOT"
-test -s "$LICENSE_ROOT/crate-licenses.tsv"
+# Each binary links its own crate closure, so each package ships that
+# closure's notices and declares its conjunction of licences; --check holds
+# every package definition to it (PEI-1163). The debug sources cover both
+# closures. The Peios Git crates carry no package-local notice; ship the
+# reviewed notices of those same pinned sources.
+collect_licences() {
+  out=$1
+  roots=$2
+  shift 2
+  root_args=
+  for root in $roots; do root_args="$root_args --root $root"; done
+  for definition in "$@"; do
+    # shellcheck disable=SC2086 # crate names are single words
+    /usr/libexec/peios-packaging/collect-rust-licences \
+      --licence-root "$LICENSE_ROOT/$out" $root_args \
+      --notice "git+https://github.com/peios/netd.git=third-party/netd-LICENSE" \
+      --notice "git+https://github.com/peios/resolvd.git=third-party/resolvd-LICENSE" \
+      --notice "git+https://github.com/peios/trustd.git=third-party/trustd-LICENSE" \
+      --notice "git+https://github.com/peios/peios-rs.git=third-party/peios-rs-LICENSE" \
+      --check "packages.pekit/$definition.package.pekit.toml"
+  done
+  test -s "$LICENSE_ROOT/$out/crate-licenses.tsv"
+}
+collect_licences timed timed dev.peios.timed dev.peios.timed-debuginfo
+collect_licences clock clock dev.peios.clock dev.peios.clock-debuginfo
+collect_licences debugsource "timed clock" dev.peios.timed-debugsource
 
 # Split each independently installable executable, sharing one exact source
-# tree for the release and its vendored/path dependency closure.
+# tree for the release and its vendored/path dependency closure. This stays
+# local rather than using /usr/libexec/peios-packaging/split-debug: symbols
+# go to per-component debuginfo trees, and the vendored crates' sources live
+# in $PEKIT_VENDOR_OUT, outside any single build root split-debug copies
+# sources from; the loop below resolves them there.
 : > "$PEKIT_OUT/.debug-sources"
 split_debug() {
   component=$1
@@ -211,6 +237,7 @@ test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 "org.llvm.clang-devel"     = ">= 22.1.8"
 "org.pkgconf.pkgconf"      = "*"
 "dev.peios.libpeios-devel" = ">= 0.5.0"
+"dev.peios.packaging-tools" = "*"
 
 [test]
 gate = true

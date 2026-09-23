@@ -1,11 +1,13 @@
 [package]
 name        = "dev.peios.clock-debuginfo"
 description = "Debugging symbols for the Peios time operator command"
+# The same crate closure as clock; checked by build.main.
+license     = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 [dependencies]
 "dev.peios.clock" = "= {{release}}"
 
 [files]
 "@source:LICENSE"                  = "usr/share/licenses/dev.peios.clock-debuginfo/LICENSE"
-":licenses/**"                     = "usr/share/licenses/dev.peios.clock-debuginfo/third-party"
+":licenses/clock/**"               ="usr/share/licenses/dev.peios.clock-debuginfo/third-party"
 ":debug/clock/usr/lib/debug/**"    = "usr/lib/debug"

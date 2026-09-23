@@ -2,6 +2,8 @@
 name         = "dev.peios.timed-debugsource"
 architecture = "x86_64"
 description  = "Debug sources for timed and clock"
+# The union of both binaries' crate closures; checked by build.main.
+license      = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 AND ISC) AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 [dependencies]
 "dev.peios.timed-debuginfo" = "= {{release}}"
@@ -9,5 +11,5 @@ description  = "Debug sources for timed and clock"
 
 [files]
 "@source:LICENSE"   = "usr/share/licenses/dev.peios.timed-debugsource/LICENSE"
-":licenses/**"      = "usr/share/licenses/dev.peios.timed-debugsource/third-party"
+":licenses/debugsource/**" ="usr/share/licenses/dev.peios.timed-debugsource/third-party"
 ":usr/src/debug/**" = "usr/src/debug"

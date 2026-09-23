@@ -7,6 +7,9 @@ side_effects = ["man-db"]
 [package]
 name        = "dev.peios.clock"
 description = "Operator command for the Peios time client"
+# The crate closure clock links; build.main's collect-rust-licences --check
+# holds this to what those crates declare.
+license     = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 
 
@@ -17,6 +20,6 @@ description = "Operator command for the Peios time client"
 
 [files]
 "@source:LICENSE" = "usr/share/licenses/dev.peios.clock/LICENSE"
-":licenses/**"    = "usr/share/licenses/dev.peios.clock/third-party"
+":licenses/clock/**" ="usr/share/licenses/dev.peios.clock/third-party"
 ":usr/bin/clock"  = "usr/bin/clock"
 ":usr/share/man/man1/clock.1.gz" = "usr/share/man/man1/clock.1.gz"
