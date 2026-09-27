@@ -18,18 +18,9 @@ STATE=/var/state/timed
 
 mkdir -p "$STATE"
 
-# The whole descriptor at once, with --replace.
-#
-# Not an incremental `sd allow`: a directory whose DACL is *absent* grants
-# implicit full access, and adding a single ACE to it creates a one-ACE
-# DACL that locks out everyone the absent DACL was admitting -- including
-# administrators. That is a real bug this project has already had once,
-# in trustd's equivalent hook. Write the descriptor whole.
-#
-# CI,OI so the cookie files timed creates inherit it rather than needing a
-# second pass. Everyone gets nothing: a machine's NTS cookies are linkable
-# to it, and nothing outside timed has any business reading them.
-sd allow --replace --flags CI,OI "$STATE" \
-  "S-1-5-18:f" "S-1-5-32-544:f" "$TIMED_SID:f"
+# A complete protected inheritance scope. `sd allow --replace` only replaces
+# ACEs for the named principals; it leaves an inherited Everyone grant intact.
+# Establish this before timed can create any cookie files.
+sd set "$STATE" "O:SYG:SYD:P(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GA;;;$TIMED_SID)"
 
 mkdir -p "$STATE/cookies"
