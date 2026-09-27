@@ -2,7 +2,7 @@
   "_comment": [
     "The timed service definition and the machine's time policy keys.",
     "",
-    "Identity is LocalService plus one privilege. timed is the only process",
+    "Identity is Service (the daemon's own virtual account) plus one privilege. timed is the only process",
     "on the machine permitted to set the clock, and SeSystemtimePrivilege is",
     "the whole of what it needs -- KACS maps it to CAP_SYS_TIME, which is",
     "what adjtimex(2) checks. It is granted to timed's *service SID* in",
@@ -71,7 +71,7 @@
       "values": [
         { "name": "ImagePath", "type": "sz", "data": "/usr/sbin/timed" },
         { "name": "Triggers", "type": "multi", "data": ["boot"] },
-        { "name": "Identity", "type": "sz", "data": "LocalService" },
+        { "name": "Identity", "type": "sz", "data": "Service" },
         {
           "name": "RequiredPrivileges",
           "type": "multi",
