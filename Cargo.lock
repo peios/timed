@@ -304,16 +304,16 @@ dependencies = [
 
 [[package]]
 name = "libnetd"
-version = "0.1.1"
-source = "git+https://github.com/peios/netd.git?rev=301fdabdeb5ef67fcaa308b9522f9b24aeef4cf4#301fdabdeb5ef67fcaa308b9522f9b24aeef4cf4"
+version = "0.1.5"
+source = "git+https://github.com/peios/netd.git?rev=12543fbdf14475f30679665246714e1c7e3fa37f#12543fbdf14475f30679665246714e1c7e3fa37f"
 dependencies = [
  "peios",
 ]
 
 [[package]]
 name = "libresolv"
-version = "0.1.0"
-source = "git+https://github.com/peios/resolvd.git?rev=aea35d430d75cb02aa6fa471734ade959112c85b#aea35d430d75cb02aa6fa471734ade959112c85b"
+version = "0.1.5"
+source = "git+https://github.com/peios/resolvd.git?rev=05443509f779c19ef2452362f832d0d6bd3aca94#05443509f779c19ef2452362f832d0d6bd3aca94"
 
 [[package]]
 name = "libtimed"
@@ -324,8 +324,8 @@ dependencies = [
 
 [[package]]
 name = "libtrust"
-version = "0.1.1"
-source = "git+https://github.com/peios/trustd.git?rev=0887b819ce63e96e6d27164ee9ca4179784ce222#0887b819ce63e96e6d27164ee9ca4179784ce222"
+version = "0.1.5"
+source = "git+https://github.com/peios/trustd.git?rev=7ba20f85263f566677d3773f92e41031c50b2eff#7ba20f85263f566677d3773f92e41031c50b2eff"
 dependencies = [
  "peios",
 ]
@@ -374,7 +374,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "peios"
 version = "0.4.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=f4309f78fbaa878a14429a5e07d778dba9ddfab7#f4309f78fbaa878a14429a5e07d778dba9ddfab7"
+source = "git+https://github.com/peios/peios-rs.git?rev=2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35#2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35"
 dependencies = [
  "bitflags",
  "libc",
@@ -384,7 +384,7 @@ dependencies = [
 [[package]]
 name = "peios-sys"
 version = "0.3.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=f4309f78fbaa878a14429a5e07d778dba9ddfab7#f4309f78fbaa878a14429a5e07d778dba9ddfab7"
+source = "git+https://github.com/peios/peios-rs.git?rev=2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35#2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35"
 dependencies = [
  "bindgen",
  "pkg-config",

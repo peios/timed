@@ -1,10 +1,11 @@
 //! `clock` — the time client's operator command.
 //!
-//! Reads over timed's socket and prints. It writes nothing: the machine's
+//! Reads over timed's socket and prints. It writes no policy: the machine's
 //! time policy lives in `Machine\System\Time`, and `reg` is how a registry
 //! value is set, so a second way of writing the same values would be a
-//! second permission model to keep in step with the first. The one verb
-//! that acts is `reload`, which asks timed to re-read what `reg` wrote.
+//! second permission model to keep in step with the first. The two verbs
+//! that act are `reload`, which asks timed to re-read what `reg` wrote, and
+//! `set`, which asks timed to set the clock while `Automatic` is 0.
 //!
 //! It is called `clock` rather than `time` because `time` is a shell
 //! keyword: `time status` would run `status` and report how long it took.
@@ -29,6 +30,9 @@ usage: clock <command>
   status              how well the clock is being kept
   sources             every configured source and how it is faring
   reload              re-read Machine\\System\\Time and poll now
+  set TIME            set the clock, while Automatic is 0
+                      TIME is local: 2026-10-04 14:05 or 2026-10-04 14:05:30,
+                      or @SECONDS since 1970 (UTC)
 
 Time policy is registry configuration; set it with reg, then `clock reload`.
 ";
@@ -49,6 +53,14 @@ fn main() -> ExitCode {
         "status" => status(),
         "sources" => sources(),
         "reload" => reload(),
+        "set" => match arguments[1..].join(" ").as_str() {
+            "" => {
+                eprintln!("clock: set needs a time");
+                eprint!("{HELP}");
+                USAGE
+            }
+            time => set(time),
+        },
         other => {
             eprintln!("clock: unknown command {other:?}");
             eprint!("{HELP}");
@@ -126,8 +138,13 @@ fn status() -> u8 {
     };
 
     println!("generation   {}", s.generation);
+    println!(
+        "time zone    {}",
+        s.zone.as_deref().unwrap_or("UTC (none chosen)")
+    );
     print!("state        {}", s.sync.as_str());
     match s.sync {
+        _ if s.manual => println!(" — Automatic is 0: the clock is set by hand"),
         Sync::Unsynchronised => println!(" — the clock is not being steered"),
         Sync::Spike => println!(" — a large offset is being timed; the clock is untouched"),
         _ => println!(),
@@ -261,6 +278,72 @@ fn truncate(s: &str, width: usize) -> String {
     format!("…{tail}")
 }
 
+fn set(time: &str) -> u8 {
+    let (seconds, nanos) = match parse_time(time) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("clock: {e}");
+            return USAGE;
+        }
+    };
+    match ask(Request::Set { seconds, nanos }) {
+        Ok(Reply::Ok) => {
+            println!("the clock is set");
+            OK
+        }
+        Ok(Reply::Error(e)) => fail(e),
+        Ok(other) => fail(format!("unexpected reply {other:?}")),
+        Err(e) => fail(e),
+    }
+}
+
+/// `@SECONDS`, or a local `YYYY-MM-DD HH:MM[:SS]` (a `T` may stand for the
+/// space). Local means the machine's time zone, which `mktime` reads from
+/// `/etc/localtime` — the zone timed itself keeps there.
+fn parse_time(text: &str) -> Result<(i64, u32), String> {
+    if let Some(seconds) = text.strip_prefix('@') {
+        return seconds
+            .parse()
+            .map(|s| (s, 0))
+            .map_err(|_| format!("{text:?} is not a number of seconds"));
+    }
+    let bad = || format!("{text:?} is not a time like 2026-10-04 14:05");
+    let (date, clock) = text.split_once([' ', 'T']).ok_or_else(bad)?;
+    let date: Vec<&str> = date.split('-').collect();
+    let clock: Vec<&str> = clock.trim().split(':').collect();
+    if date.len() != 3 || !(2..=3).contains(&clock.len()) {
+        return Err(bad());
+    }
+    let number = |s: &str| s.parse::<i32>().map_err(|_| bad());
+    let (year, month, day) = (number(date[0])?, number(date[1])?, number(date[2])?);
+    let (hour, minute) = (number(clock[0])?, number(clock[1])?);
+    let second = clock.get(2).map_or(Ok(0), |s| number(s))?;
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || !(0..=23).contains(&hour)
+        || !(0..=59).contains(&minute)
+        || !(0..=60).contains(&second)
+    {
+        return Err(bad());
+    }
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;
+    tm.tm_mday = day;
+    tm.tm_hour = hour;
+    tm.tm_min = minute;
+    tm.tm_sec = second;
+    // Let the zone say whether summer time applies on that date.
+    tm.tm_isdst = -1;
+    // Safe: a fully initialised tm, which mktime normalises in place.
+    let seconds = unsafe { libc::mktime(&mut tm) };
+    // mktime normalises 31 February into March rather than refusing it.
+    if seconds == -1 || tm.tm_mday != day || tm.tm_mon != month - 1 {
+        return Err(bad());
+    }
+    Ok((seconds, 0))
+}
+
 fn reload() -> u8 {
     match ask(Request::Reload) {
         Ok(Reply::Ok) => {
@@ -270,5 +353,35 @@ fn reload() -> u8 {
         Ok(Reply::Error(e)) => fail(e),
         Ok(other) => fail(format!("unexpected reply {other:?}")),
         Err(e) => fail(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seconds_since_1970_are_taken_as_they_are() {
+        assert_eq!(parse_time("@1790000000"), Ok((1_790_000_000, 0)));
+        assert!(parse_time("@soon").is_err());
+    }
+
+    #[test]
+    fn a_local_time_is_read_and_one_that_does_not_exist_refused() {
+        // The zone is whatever the machine running the test is in, so only
+        // the shape is checked: a minute later is sixty seconds later.
+        let (a, _) = parse_time("2026-10-04 14:05").unwrap();
+        let (b, _) = parse_time("2026-10-04T14:06:00").unwrap();
+        assert_eq!(b - a, 60);
+        for nonsense in [
+            "2026-02-31 12:00",
+            "2026-13-01 12:00",
+            "2026-10-04 25:00",
+            "2026-10-04",
+            "tomorrow",
+            "2026-10-04 14",
+        ] {
+            assert!(parse_time(nonsense).is_err(), "{nonsense:?}");
+        }
     }
 }

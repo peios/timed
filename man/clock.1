@@ -19,8 +19,11 @@ then ask the daemon to reload it.
 .SH COMMANDS
 .TP
 .B status
-Show synchronisation state, selected peer, offset, frequency, jitter,
-accuracy, update count, and the build-time clock floor.
+Show the time zone, synchronisation state, selected peer, offset,
+frequency, jitter, accuracy, update count, and the build-time clock floor.
+While
+.B Automatic
+is 0 the state says the clock is set by hand.
 .TP
 .B sources
 List configured sources, their authentication and reachability, and their
@@ -30,6 +33,20 @@ part in source selection.
 Re-read
 .B Machine\\System\\Time
 and poll immediately.  This operation requires control access to timed's
+control object.
+.TP
+.BI set " TIME"
+Set the clock.  Only while
+.B Machine\\System\\Time Automatic
+is 0; otherwise timed keeps the clock from its sources and refuses.
+.I TIME
+is a local time in the machine's time zone, written
+.B 2026-10-04 14:05
+or
+.BR 2026-10-04T14:05:30 ,
+or
+.BI @ SECONDS
+since 1970 UTC.  This operation requires control access to timed's
 control object.
 .TP
 .BR help , " -h" , " --help"

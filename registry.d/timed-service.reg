@@ -2,8 +2,8 @@
   "_comment": [
     "The timed service definition and the machine's time policy keys.",
     "",
-    "Identity is Service (the daemon's own virtual account) plus one privilege. timed is the only process",
-    "on the machine permitted to set the clock, and SeSystemtimePrivilege is",
+    "Identity is Service (the daemon's own virtual account) plus one privilege. timed is the one service",
+    "on the machine that keeps the clock, and SeSystemtimePrivilege is",
     "the whole of what it needs -- KACS maps it to CAP_SYS_TIME, which is",
     "what adjtimex(2) checks. It is granted to timed's *service SID* in",
     "timed-policy.reg rather than to LocalService, so trustd, resolvd and",

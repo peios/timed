@@ -3,6 +3,7 @@ pub mod config;
 pub mod control;
 pub mod discipline;
 pub mod filter;
+pub mod localtime;
 pub mod log;
 pub mod netd_link;
 pub mod nts_ke;

@@ -24,3 +24,20 @@ mkdir -p "$STATE"
 sd set "$STATE" "O:SYG:SYD:P(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GA;;;$TIMED_SID)"
 
 mkdir -p "$STATE/cookies"
+
+# The time zone. /etc is a merged view whose top layer, /system/retc, holds
+# what is rendered from the registry, and /system/retc is SYSTEM's: timed
+# cannot make /etc/localtime there itself. So this makes the file, and
+# timed copies the zone `Machine\System\Time TimeZone` names into it. (A
+# copy, not a link: making a link needs SeCreateSymbolicLinkPrivilege.)
+#
+# The descriptor is written whole, as trustd's prepare-store explains: a
+# file made under /system/retc comes out with no DACL at all, which is
+# implicit full access to everyone. timed may write it and nothing else;
+# everyone may read it, since every program reads /etc/localtime.
+LOCALTIME=/system/retc/localtime
+if [ -L "$LOCALTIME" ] || [ ! -f "$LOCALTIME" ]; then
+  rm -f "$LOCALTIME"
+  : > "$LOCALTIME"
+fi
+sd set "$LOCALTIME" "O:SYG:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;$TIMED_SID)(A;;GR;;;WD)"
