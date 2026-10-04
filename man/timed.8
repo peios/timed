@@ -56,11 +56,22 @@ Persisted learned oscillator frequency.
 .B /var/state/timed/cookies/
 Persisted NTS cookies.  This directory is private to SYSTEM,
 Administrators, and timed's service SID.
+.TP
+.B /etc/localtime
+The machine's time zone, from
+.BR "Machine\\System\\Time TimeZone" :
+a copy timed makes of the zone's file under
+.BR /usr/share/zoneinfo ,
+again at every start.
 .SH SERVICE INTEGRATION
 The package supplies inert Registry Image Manager seeds for the service,
 time policy, and the service-SID privilege grant.  An image must explicitly
 select those seeds.  The service runs as LocalService; its pre-start hook runs
-as SYSTEM only to provision the protected state directory.
+as SYSTEM only to provision the protected state directory, and
+.B /etc/localtime
+in the registry-rendered layer of
+.BR /etc ,
+which only timed may write.
 .SH SEE ALSO
 .BR clock (1),
 .BR reg (1),

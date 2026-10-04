@@ -4,11 +4,15 @@ canonical: Machine\System\Time
 The machine's time policy: where the clock comes from and what it is
 allowed to believe.
 
-timed reads this subtree, polls the sources it names, and is the only
-process on the machine permitted to set the clock. It holds
-`SeSystemtimePrivilege` and nothing else; the grant is a record on its own
-service SID under `Machine\Generic\Authn\Policy`, so no other service
-running as LocalService acquires it.
+timed reads this subtree, polls the sources it names, and keeps the
+clock. It holds `SeSystemtimePrivilege` and nothing else; the grant is a
+record on its own service SID under `Machine\Generic\Authn\Policy`, so no
+other service running as LocalService acquires it. Administrators hold
+the same privilege by default, but a clock set behind timed's back is one
+it measures as an error: put right at the next poll, or, if it is more
+than 1000 seconds out after timed has been synchronised, refused as a
+panic. To set the clock by hand, set `Automatic` to 0 and ask timed
+(`clock set`, or System Settings).
 
 Everything here takes effect within a second or two of being written —
 timed watches this subtree — except that a change to `Servers` restarts
@@ -164,8 +168,57 @@ because what time the machine thinks it is, and how well it knows, is not
 a secret, and a program deciding whether the clock is trustworthy enough
 to validate a certificate should not need a privilege to find out.
 
-Only `reload` needs control. Changing the time policy itself is a registry
-write governed by this key's own descriptor, not by this value.
+Only `reload` and `set` need control. Changing the time policy itself is a
+registry write governed by this key's own descriptor, not by this value.
+
+--- machine\system\time automatic
+canonical: Machine\System\Time Automatic
+type: REG_DWORD
+default: 1
+applies: live
+
+Whether timed keeps the clock from its sources.
+
+- `1` (the default) — timed polls the sources and steers the clock.
+  Asking it to set the clock is refused, because the next poll would put
+  it back.
+- `0` — timed polls nothing, and the clock is set by hand: `clock set`,
+  or System Settings, asks timed to set it, which needs the control right
+  on `ControlSecurity`. The frequency timed last learned stays in force,
+  so the clock drifts no faster than the crystal allows. A time set this
+  way reaches the hardware clock within eleven minutes, so it survives a
+  reboot.
+
+`clock status` says `set by hand` while this is 0, and the state is
+`unsynchronised`: nothing is checking the clock against anything, and a
+service that needs `timed:synchronised` waits.
+
+Setting it back to 1 starts the sources afresh. However far the clock was
+set from the truth, the first agreement steps it there, as at startup.
+
+--- machine\system\time timezone
+canonical: Machine\System\Time TimeZone
+type: REG_SZ
+default: (absent — UTC)
+valid: a zone name from the tzdata package, such as `Europe/London` or `America/New_York`
+applies: live
+
+The machine's time zone. Everything that shows a local time follows it:
+the C library, which reads `/etc/localtime`, and so every program; the
+desktop's clock; and peinit's calendar timers with no zone of their own.
+
+timed keeps `/etc/localtime` a copy of the named file under
+`/usr/share/zoneinfo`, made again whenever this value changes and every
+time timed starts, so a tzdata upgrade reaches it by the next boot.
+Programs already running pick the new zone up the next time they look,
+which for most is the next time they show a time.
+
+A name tzdata does not have is refused and logged, and the machine stays
+on the zone it was on; `clock status` shows the zone in force. Absent is
+UTC.
+
+There is one zone for the whole machine. Times are stored and exchanged
+in UTC throughout Peios; this is only how they are shown.
 
 --- machine\generic\authn\policy\s-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 privileges
 canonical: Machine\Generic\Authn\Policy\S-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 Privileges

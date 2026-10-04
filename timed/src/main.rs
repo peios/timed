@@ -42,6 +42,7 @@ use timed::config::{self, Config, ServerSpec};
 use timed::control::{self, ControlObject};
 use timed::discipline::{Adjustment, Discipline, State};
 use timed::filter::FilterOutcome;
+use timed::localtime;
 use timed::netd_link::NetdLink;
 use timed::select::{self, Candidate, NoSelection};
 use timed::source::{BURST, Rejected, Security, Source};
@@ -160,6 +161,11 @@ struct Timed {
     /// Monotonic time to next attempt the roots.
     roots_after: f64,
     started: Instant,
+    /// The `TimeZone` value last acted on, so a registry write that changed
+    /// something else does not re-link the zone.
+    zone_wanted: Option<Option<String>>,
+    /// The zone `/etc/localtime` names, as last made. `None` is UTC.
+    zone: Option<String>,
 }
 
 impl Timed {
@@ -215,6 +221,8 @@ impl Timed {
             roots_after: 0.0,
             config,
             started: now,
+            zone_wanted: None,
+            zone: None,
         }
     }
 
@@ -228,6 +236,7 @@ impl Timed {
             self.precision,
             timed::clock::BUILD_EPOCH
         ));
+        self.apply_zone();
         self.rebuild_sources();
 
         // Ready means "the socket is listening", not "the clock is right".
@@ -267,6 +276,21 @@ impl Timed {
 
     /// Work out the source list from the precedence order and build it.
     fn rebuild_sources(&mut self) {
+        if !self.config.automatic {
+            // Set by hand: nothing is polled, so nothing can put the
+            // clock back. The frequency last learned stays with the kernel,
+            // which is the best the clock can do on its own.
+            if !self.entries.is_empty() {
+                log::info(format_args!(
+                    "Automatic is 0: the clock is set by hand, and no source is polled"
+                ));
+            }
+            self.entries.clear();
+            self.system_peer = None;
+            self.offset = 0.0;
+            self.jitter = 0.0;
+            return;
+        }
         let specs = self.chosen_specs();
         let origin = self.chosen_origin();
 
@@ -400,10 +424,76 @@ impl Timed {
     }
 
     fn reload(&mut self) {
+        let was_automatic = self.config.automatic;
         self.config = config::load();
         self.control = ControlObject::new(self.config.control_security.as_deref());
         self.registry_watch = config::watch().ok();
+        if self.config.automatic && !was_automatic {
+            // Back from being set by hand. Whatever the person set may be
+            // hours from the truth, and a loop that thinks it has been
+            // keeping the clock all along would call that a panic and
+            // refuse it; a fresh loop takes it as a startup step. The
+            // frequency is kept, since nothing has changed the crystal.
+            log::info(format_args!(
+                "Automatic is 1 again: the clock is kept from its sources"
+            ));
+            self.discipline = Discipline::new(self.discipline.frequency());
+        }
+        self.apply_zone();
         self.rebuild_sources();
+    }
+
+    /// Put `TimeZone` in place, when it has changed since last time.
+    fn apply_zone(&mut self) {
+        if self.zone_wanted.as_ref() == Some(&self.config.time_zone) {
+            return;
+        }
+        self.zone_wanted = Some(self.config.time_zone.clone());
+        match localtime::render(self.config.time_zone.as_deref()) {
+            Ok(zone) => {
+                log::info(format_args!(
+                    "the time zone is {}",
+                    zone.as_deref().unwrap_or(localtime::DEFAULT)
+                ));
+                self.zone = zone;
+            }
+            Err(why) => log::warn(format_args!(
+                "TimeZone: {why}; staying on {}",
+                self.zone.as_deref().unwrap_or(localtime::DEFAULT)
+            )),
+        }
+    }
+
+    /// Set the clock to what a person said, while it is theirs to set.
+    fn set_by_hand(&mut self, seconds: i64, nanos: u32) -> Reply {
+        if self.config.automatic {
+            return Reply::Error(
+                "the clock is kept from its sources; set Automatic to 0 to set it by hand".into(),
+            );
+        }
+        let target = seconds as f64 + nanos as f64 / 1e9;
+        let by = target - self.clock.now_f64();
+        if let Err(e) = self.clock.step(by) {
+            return Reply::Error(format!("could not set the clock: {e}"));
+        }
+        log::info(format_args!("set by hand: stepped the clock by {by:+.3}s"));
+        self.reference_time = self.clock.now_f64();
+        // Someone who sets the clock is saying it is right, and saying so to
+        // the kernel is what lets its eleven-minute mode carry the time to
+        // the hardware clock, so that it survives a reboot. The kernel's own
+        // error bound grows from the second given here and withdraws the
+        // claim by itself some hours later.
+        let steering = Steering {
+            frequency: self.discipline.frequency(),
+            max_error: 1.0,
+            est_error: 1.0,
+            synchronised: true,
+            leap: Leap::None,
+        };
+        if let Err(e) = self.clock.steer(steering) {
+            log::warn(format_args!("could not mark the clock as set: {e}"));
+        }
+        Reply::Ok
     }
 
     fn absorb_netd(&mut self) {
@@ -1081,6 +1171,8 @@ impl Timed {
                 .filter(|e| matches!(e.state, SourceState::Candidate | SourceState::SystemPeer))
                 .count() as u32,
             floor: timed::clock::BUILD_EPOCH,
+            manual: !self.config.automatic,
+            zone: self.zone.clone(),
         }
     }
 
@@ -1243,6 +1335,10 @@ impl Timed {
                         entry.source.burst = BURST;
                         entry.source.next_poll = now;
                     }
+                }
+                Request::Set { seconds, nanos } => {
+                    let reply = self.set_by_hand(seconds, nanos);
+                    let _ = control::write_reply(&mut stream, &reply);
                 }
             }
         }

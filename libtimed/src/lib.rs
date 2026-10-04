@@ -26,7 +26,13 @@
 //! because everything it must say about the machine's time arrives here.
 //! A snapshot carries exactly the fields an NTP reply needs and no more.
 //!
-//! This crate is inert: types and a codec, nothing that can act.
+//! This crate is inert: types and a codec, nothing that can act. It also
+//! holds the two pieces of policy grammar a program writing
+//! `Machine\System\Time` needs to check what it writes against what timed
+//! will accept: [`servers`] and [`zone`].
+
+pub mod servers;
+pub mod zone;
 
 use std::io::{self, Read, Write};
 use std::os::unix::net::UnixStream;
@@ -76,6 +82,20 @@ pub const MAX_POLL_VALUE: &str = "MaxPoll";
 pub const SYNC_RTC_VALUE: &str = "SyncRTC";
 /// `ControlSecurity` REG_BINARY: the control object's descriptor.
 pub const CONTROL_SECURITY_VALUE: &str = "ControlSecurity";
+/// `Automatic` REG_DWORD, default 1. Whether timed keeps the clock from its
+/// sources. At 0 it polls nothing and the clock is set by hand, with
+/// [`Request::Set`].
+pub const AUTOMATIC_VALUE: &str = "Automatic";
+/// `TimeZone` REG_SZ: the machine's time zone, an IANA name such as
+/// `Europe/London`. Absent means UTC.
+pub const TIME_ZONE_VALUE: &str = "TimeZone";
+
+/// Where the time zone database is installed (the tzdata package).
+pub const ZONEINFO_DIR: &str = "/usr/share/zoneinfo";
+/// `/etc/localtime`, in the registry-rendered layer of `/etc`. timed keeps
+/// a copy of the zone in force here. `/system/retc` is SYSTEM's, so timed's
+/// pre-start hook makes the file and lets timed write it.
+pub const LOCALTIME: &str = "/system/retc/localtime";
 
 /// Rights on the control object.
 pub const TIME_QUERY: u32 = 0x1;
@@ -319,6 +339,13 @@ pub struct Status {
     /// build timestamp. Reported because "your clock is being clamped" is
     /// otherwise invisible and looks like the network being broken.
     pub floor: i64,
+    /// `Automatic` is 0: timed polls nothing, and the clock is set by hand.
+    /// Named for the exception so that a timed too old to send it reads as
+    /// automatic, which it is.
+    pub manual: bool,
+    /// The time zone `/etc/localtime` names, as timed last made it. `None`
+    /// is UTC: nothing chosen, or a choice that could not be honoured.
+    pub zone: Option<String>,
 }
 
 /// What the future NTP server needs in order to answer a query, and nothing
@@ -367,6 +394,10 @@ pub enum Request {
     Subscribe,
     /// Re-read the registry, re-resolve every source name, and poll now.
     Reload,
+    /// Set the clock to this Unix time. Only while `Automatic` is 0: a
+    /// clock timed is keeping from its sources would be put back at the
+    /// next poll, or, past the panic threshold, left wrong.
+    Set { seconds: i64, nanos: u32 },
 }
 
 impl Request {
@@ -377,6 +408,12 @@ impl Request {
             Request::Sources => "sources",
             Request::Subscribe => "subscribe",
             Request::Reload => "reload",
+            Request::Set { seconds, nanos } => {
+                w.write_map(3).write_str("query").write_str("set");
+                w.write_str("seconds").write_int(*seconds);
+                w.write_str("nanos").write_uint(*nanos as u64);
+                return w.to_bytes().expect("a request encodes");
+            }
         };
         w.write_map(1).write_str("query").write_str(query);
         w.to_bytes().expect("a request encodes")
@@ -385,10 +422,14 @@ impl Request {
     pub fn decode(bytes: &[u8]) -> Result<Request, WireError> {
         let mut r = Reader::new(bytes);
         let mut query = None;
+        let mut seconds = None;
+        let mut nanos = 0;
         let mut seen = Vec::new();
         for_each_field(&mut r, &mut seen, |key, r| {
             match key {
                 "query" => query = Some(r.read_str()?.to_owned()),
+                "seconds" => seconds = Some(r.read_int()?),
+                "nanos" => nanos = r.read_uint()?,
                 _ => r.skip()?,
             }
             Ok(())
@@ -398,6 +439,16 @@ impl Request {
             Some("sources") => Ok(Request::Sources),
             Some("subscribe") => Ok(Request::Subscribe),
             Some("reload") => Ok(Request::Reload),
+            Some("set") => {
+                let seconds = seconds.ok_or(WireError::Missing("seconds"))?;
+                if nanos >= 1_000_000_000 {
+                    return Err(WireError::Invalid("nanos is a second or more"));
+                }
+                Ok(Request::Set {
+                    seconds,
+                    nanos: nanos as u32,
+                })
+            }
             Some(other) => Err(WireError::UnknownQuery(other.to_owned())),
             None => Err(WireError::Missing("query")),
         }
@@ -411,7 +462,7 @@ impl Request {
     /// should not need a privilege to find out.
     pub fn required_right(&self) -> u32 {
         match self {
-            Request::Reload => TIME_CONTROL,
+            Request::Reload | Request::Set { .. } => TIME_CONTROL,
             _ => TIME_QUERY,
         }
     }
@@ -441,7 +492,7 @@ impl Reply {
                 w.write_str("message").write_str(message);
             }
             Reply::Status(s) => {
-                w.write_map(18).write_str("reply").write_str("status");
+                w.write_map(20).write_str("reply").write_str("status");
                 w.write_str("generation").write_uint(s.generation);
                 w.write_str("sync").write_str(s.sync.as_str());
                 write_opt_str(&mut w, "system_peer", &s.system_peer);
@@ -460,6 +511,8 @@ impl Reply {
                 w.write_str("sources").write_uint(s.sources as u64);
                 w.write_str("selected").write_uint(s.selected as u64);
                 w.write_str("floor").write_int(s.floor);
+                w.write_str("manual").write_bool(s.manual);
+                write_opt_str(&mut w, "zone", &s.zone);
             }
             Reply::Sources { sources, more } => {
                 w.write_map(3).write_str("reply").write_str("sources");
@@ -550,6 +603,8 @@ impl Reply {
                 "last_update" => status.last_update = r.read_float()?,
                 "selected" => status.selected = r.read_uint()? as u32,
                 "floor" => status.floor = r.read_int()?,
+                "manual" => status.manual = r.read_bool()?,
+                "zone" => status.zone = read_opt_str(r)?,
                 "reference_id" => snapshot.reference_id = r.read_bin()?.to_vec(),
                 "reference_time" => snapshot.reference_time = r.read_float()?,
                 "precision" => snapshot.precision = r.read_int()? as i32,
@@ -693,6 +748,7 @@ fn for_each_field<'a>(
 pub enum WireError {
     Encoding(peios::Error),
     Missing(&'static str),
+    Invalid(&'static str),
     Duplicate(String),
     UnknownQuery(String),
     TooLarge(usize),
@@ -704,6 +760,7 @@ impl std::fmt::Display for WireError {
         match self {
             WireError::Encoding(e) => write!(f, "malformed message: {e}"),
             WireError::Missing(k) => write!(f, "missing field {k}"),
+            WireError::Invalid(why) => write!(f, "invalid field: {why}"),
             WireError::Duplicate(k) => write!(f, "duplicate field {k}"),
             WireError::UnknownQuery(q) => write!(f, "unknown query {q:?}"),
             WireError::TooLarge(n) => write!(f, "message of {n} bytes exceeds the ceiling"),
@@ -790,10 +847,26 @@ mod tests {
             Request::Sources,
             Request::Subscribe,
             Request::Reload,
+            Request::Set {
+                seconds: 1_790_000_000,
+                nanos: 250_000_000,
+            },
+            Request::Set {
+                seconds: -5,
+                nanos: 0,
+            },
         ] {
             assert_eq!(Request::decode(&req.encode()).unwrap(), req);
         }
         assert_eq!(Request::Reload.required_right(), TIME_CONTROL);
+        assert_eq!(
+            Request::Set {
+                seconds: 0,
+                nanos: 0
+            }
+            .required_right(),
+            TIME_CONTROL
+        );
         assert_eq!(Request::Status.required_right(), TIME_QUERY);
         assert_eq!(Request::Subscribe.required_right(), TIME_QUERY);
     }
@@ -818,8 +891,18 @@ mod tests {
             sources: 4,
             selected: 3,
             floor: 1_756_000_000,
+            manual: false,
+            zone: Some("Europe/London".into()),
         });
         assert_eq!(Reply::decode(&reply.encode()).unwrap(), reply);
+
+        // A clock set by hand, in UTC.
+        let manual = Reply::Status(Status {
+            manual: true,
+            zone: None,
+            ..Status::default()
+        });
+        assert_eq!(Reply::decode(&manual.encode()).unwrap(), manual);
 
         // And with nothing selected, which is the interesting case.
         let empty = Reply::Status(Status {
@@ -906,6 +989,47 @@ mod tests {
         let mut buf = Vec::new();
         send(&mut buf, &bytes).unwrap();
         assert_eq!(recv(&mut &buf[..]).unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_set_without_a_time_or_with_too_many_nanoseconds_is_refused() {
+        let mut w = Writer::new();
+        w.write_map(1).write_str("query").write_str("set");
+        assert!(matches!(
+            Request::decode(&w.to_bytes().unwrap()),
+            Err(WireError::Missing("seconds"))
+        ));
+
+        let mut w = Writer::new();
+        w.write_map(3)
+            .write_str("query")
+            .write_str("set")
+            .write_str("seconds")
+            .write_int(1)
+            .write_str("nanos")
+            .write_uint(1_000_000_000);
+        assert!(matches!(
+            Request::decode(&w.to_bytes().unwrap()),
+            Err(WireError::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn a_status_from_an_older_timed_reads_as_automatic_and_utc() {
+        // The two members added with manual time and time zones are absent
+        // from an older timed's reply, and must decode as what that timed
+        // actually does: keeps the clock itself, and leaves the zone alone.
+        let mut w = Writer::new();
+        w.write_map(2)
+            .write_str("reply")
+            .write_str("status")
+            .write_str("sync")
+            .write_str("synchronised");
+        let Reply::Status(s) = Reply::decode(&w.to_bytes().unwrap()).unwrap() else {
+            panic!("not a status");
+        };
+        assert!(!s.manual);
+        assert_eq!(s.zone, None);
     }
 
     #[test]
