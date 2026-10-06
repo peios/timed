@@ -23,7 +23,7 @@ members = ["ntp", "libtimed", "timed", "clock"]
 # (netd/resolvd, authd/lpsd) exists to avoid.
 
 [workspace.package]
-version = "0.1.9"
+version = "0.1.10"
 edition = "2024"
 rust-version = "1.98.1"
 license = "MIT"
@@ -39,4 +39,4 @@ incremental = false
 
 [workspace.dependencies]
 libc = "0.2"
-peios = { git = "https://github.com/peios/peios-rs.git", rev = "02c87cb643c30eef6b74cd1d9d8b0ae067bed69a", package = "peios" }
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "f8c84930f2b71763bcf0550df0b1420a0f63b21e", package = "peios" }
