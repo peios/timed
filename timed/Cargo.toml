@@ -23,8 +23,8 @@ libtimed = { path = "../libtimed" }
 # Exact release commits make both the source graph and corresponding-source
 # package independent of mutable sibling checkouts.
 libresolv = { git = "https://github.com/peios/resolvd.git", rev = "1091520f3c5f97c53b541d1477e05d839a8eb679" }
-libnetd = { git = "https://github.com/peios/netd.git", rev = "e18bd847325c10f99f01a341f31ef6fe89ee1d14" }
-libtrust = { git = "https://github.com/peios/trustd.git", rev = "f0860ecc34f1fde15a5cd1594f5bbcc458653932" }
+libnetd = { git = "https://github.com/peios/netd.git", rev = "23af1f6b84f3764d9327eb009ced56b2a16b7aa8" }
+libtrust = { git = "https://github.com/peios/trustd.git", rev = "2fd7d86aac00e207320bda1ae11045aec3d61fbf" }
 peios = { workspace = true }
 # The house TLS stack. NTS-KE is TLS 1.3 with an ALPN of "ntske/1" and a
 # key exported from the session; nothing else about it is unusual.

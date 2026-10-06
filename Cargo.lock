@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "clock"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "libc",
  "libtimed",
@@ -304,8 +304,8 @@ dependencies = [
 
 [[package]]
 name = "libnetd"
-version = "0.1.7"
-source = "git+https://github.com/peios/netd.git?rev=e18bd847325c10f99f01a341f31ef6fe89ee1d14#e18bd847325c10f99f01a341f31ef6fe89ee1d14"
+version = "0.1.8"
+source = "git+https://github.com/peios/netd.git?rev=23af1f6b84f3764d9327eb009ced56b2a16b7aa8#23af1f6b84f3764d9327eb009ced56b2a16b7aa8"
 dependencies = [
  "peios",
 ]
@@ -317,15 +317,15 @@ source = "git+https://github.com/peios/resolvd.git?rev=1091520f3c5f97c53b541d147
 
 [[package]]
 name = "libtimed"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "peios",
 ]
 
 [[package]]
 name = "libtrust"
-version = "0.1.5"
-source = "git+https://github.com/peios/trustd.git?rev=f0860ecc34f1fde15a5cd1594f5bbcc458653932#f0860ecc34f1fde15a5cd1594f5bbcc458653932"
+version = "0.1.6"
+source = "git+https://github.com/peios/trustd.git?rev=2fd7d86aac00e207320bda1ae11045aec3d61fbf#2fd7d86aac00e207320bda1ae11045aec3d61fbf"
 dependencies = [
  "peios",
 ]
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "ntp"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "aes-siv",
 ]
@@ -374,7 +374,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "peios"
 version = "0.4.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=02c87cb643c30eef6b74cd1d9d8b0ae067bed69a#02c87cb643c30eef6b74cd1d9d8b0ae067bed69a"
+source = "git+https://github.com/peios/peios-rs.git?rev=f8c84930f2b71763bcf0550df0b1420a0f63b21e#f8c84930f2b71763bcf0550df0b1420a0f63b21e"
 dependencies = [
  "bitflags",
  "libc",
@@ -384,7 +384,7 @@ dependencies = [
 [[package]]
 name = "peios-sys"
 version = "0.3.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=02c87cb643c30eef6b74cd1d9d8b0ae067bed69a#02c87cb643c30eef6b74cd1d9d8b0ae067bed69a"
+source = "git+https://github.com/peios/peios-rs.git?rev=f8c84930f2b71763bcf0550df0b1420a0f63b21e#f8c84930f2b71763bcf0550df0b1420a0f63b21e"
 dependencies = [
  "bindgen",
  "pkg-config",
@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "timed"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "libc",
  "libnetd",

@@ -236,7 +236,7 @@ test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 "org.python.python3"       = "*"
 "org.llvm.clang-devel"     = ">= 22.1.8"
 "org.pkgconf.pkgconf"      = "*"
-"dev.peios.libpeios-devel" = ">= 0.5.0"
+"dev.peios.libpeios-devel" = ">= 0.5.8"
 "dev.peios.packaging-tools" = "*"
 
 [test]
@@ -348,4 +348,4 @@ done
 "org.python.python3"       = "*"
 "org.llvm.clang-devel"     = ">= 22.1.8"
 "org.pkgconf.pkgconf"      = "*"
-"dev.peios.libpeios-devel" = ">= 0.5.0"
+"dev.peios.libpeios-devel" = ">= 0.5.8"
