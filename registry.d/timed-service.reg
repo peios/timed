@@ -9,11 +9,14 @@
     "timed-policy.reg rather than to LocalService, so trustd, resolvd and",
     "every other LocalService daemon are unaffected.",
     "",
-    "RequiredPrivileges names two, and the second is not decoration:",
+    "RequiredPrivileges names three, and the others are not decoration:",
     "peinit REMOVES every privilege outside this list, and without",
     "SeChangeNotifyPrivilege a process cannot traverse a directory to reach",
     "a file. Naming only SeSystemtimePrivilege would produce a daemon that",
-    "can set the clock and cannot open its own drift file.",
+    "can set the clock and cannot open its own drift file. SeAuditPrivilege",
+    "is what lets timed write timed.clock.stepped (timed.evman) each time it",
+    "steps the clock; without it the clock still moves and the record of it",
+    "is lost, with a warning in the log.",
     "",
     "ExecStartPre runs prepare-state as SYSTEM (HookIdentity) to create",
     "/var/state/timed and hand it to timed's service SID. peinit provisions",
@@ -75,7 +78,7 @@
         {
           "name": "RequiredPrivileges",
           "type": "multi",
-          "data": ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege"]
+          "data": ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege", "SeAuditPrivilege"]
         },
         {
           "name": "ExecStartPre",

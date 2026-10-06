@@ -111,6 +111,13 @@ impl Clock {
         }
     }
 
+    /// The wall clock as an event's `uint.time`: nanoseconds since the
+    /// epoch, or `None` before it.
+    pub fn now_nanos(&self) -> Option<u64> {
+        let (s, ns) = self.now();
+        crate::audit::unix_nanos(s, ns)
+    }
+
     pub fn now_f64(&self) -> f64 {
         let (s, ns) = self.now();
         s as f64 + ns as f64 / 1e9

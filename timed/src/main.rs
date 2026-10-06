@@ -37,6 +37,7 @@ use libtimed::{Auth, Origin, Reply, Request, SourceInfo, SourceState, Sync};
 use ntp::{MAX_PACKET, NtpTimestamp, ReferenceId};
 use rustls::ClientConfig;
 
+use timed::audit::{self, Step};
 use timed::clock::{Clock, Leap, Steering};
 use timed::config::{self, Config, ServerSpec};
 use timed::control::{self, ControlObject};
@@ -70,12 +71,16 @@ fn main() {
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_IGN) };
 
     let clock = Clock;
+    let before = clock.now_nanos();
     match clock.enforce_floor() {
         Ok(0.0) => {}
-        Ok(by) => log::warn(format_args!(
-            "the clock read before this build's timestamp; raised it by {by:.0}s so that TLS \
-             can work — the real time is not known yet"
-        )),
+        Ok(by) => {
+            log::warn(format_args!(
+                "the clock read before this build's timestamp; raised it by {by:.0}s so that \
+                 TLS can work — the real time is not known yet"
+            ));
+            audit::clock_stepped(Step::BootFloor, before, clock.now_nanos(), None);
+        }
         Err(e) => log::error(format_args!(
             "could not raise the clock to the build floor: {e}"
         )),
@@ -466,18 +471,26 @@ impl Timed {
     }
 
     /// Set the clock to what a person said, while it is theirs to set.
-    fn set_by_hand(&mut self, seconds: i64, nanos: u32) -> Reply {
+    /// `caller` is who asked, for the record.
+    fn set_by_hand(&mut self, seconds: i64, nanos: u32, caller: control::Caller) -> Reply {
         if self.config.automatic {
             return Reply::Error(
                 "the clock is kept from its sources; set Automatic to 0 to set it by hand".into(),
             );
         }
         let target = seconds as f64 + nanos as f64 / 1e9;
+        let previous = self.clock.now_nanos();
         let by = target - self.clock.now_f64();
         if let Err(e) = self.clock.step(by) {
             return Reply::Error(format!("could not set the clock: {e}"));
         }
         log::info(format_args!("set by hand: stepped the clock by {by:+.3}s"));
+        audit::clock_stepped(
+            Step::Manual,
+            previous,
+            self.clock.now_nanos(),
+            caller.sid.as_ref().map(|sid| sid.as_bytes()),
+        );
         self.reference_time = self.clock.now_f64();
         // Someone who sets the clock is saying it is right, and saying so to
         // the kernel is what lets its eleven-minute mode carry the time to
@@ -1067,9 +1080,16 @@ impl Timed {
                 self.steer(rate);
             }
             Adjustment::Step { seconds, rate } => {
+                let previous = self.clock.now_nanos();
                 match self.clock.step(seconds) {
                     Ok(()) => {
                         log::info(format_args!("stepped the clock by {seconds:+.6}s"));
+                        audit::clock_stepped(
+                            Step::Automatic,
+                            previous,
+                            self.clock.now_nanos(),
+                            None,
+                        );
                         // Every measurement in every filter was taken
                         // against a clock that no longer exists.
                         for entry in self.entries.iter_mut() {
@@ -1289,10 +1309,10 @@ impl Timed {
                     continue;
                 }
             };
-            if !self.control.permits(&stream, request.required_right()) {
+            let Some(caller) = self.control.permits(&stream, request.required_right()) else {
                 let _ = control::write_reply(&mut stream, &Reply::Error("not permitted".into()));
                 continue;
-            }
+            };
             match request {
                 Request::Status => {
                     let _ = control::write_reply(&mut stream, &Reply::Status(self.status()));
@@ -1338,7 +1358,7 @@ impl Timed {
                     }
                 }
                 Request::Set { seconds, nanos } => {
-                    let reply = self.set_by_hand(seconds, nanos);
+                    let reply = self.set_by_hand(seconds, nanos, caller);
                     let _ = control::write_reply(&mut stream, &reply);
                 }
             }

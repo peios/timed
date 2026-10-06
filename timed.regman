@@ -225,7 +225,7 @@ in UTC throughout Peios; this is only how they are shown.
 --- machine\generic\authn\policy\s-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 privileges
 canonical: Machine\Generic\Authn\Policy\S-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 Privileges
 type: REG_MULTI_SZ
-default: SeSystemtimePrivilege, SeChangeNotifyPrivilege
+default: SeSystemtimePrivilege, SeChangeNotifyPrivilege, SeAuditPrivilege
 valid: privilege names; see the generic page for the vocabulary
 applies: next start
 
@@ -246,7 +246,10 @@ not to LocalService, which trustd and resolvd also run as.
 *removes* every privilege outside a service's `RequiredPrivileges` list,
 and without it a process cannot traverse a directory to reach a file — so
 naming only the first would produce a daemon that can set the clock and
-cannot open its own drift file.
+cannot open its own drift file. `SeAuditPrivilege` lets timed write a
+`timed.clock.stepped` event each time it steps the clock; without it the
+clock still moves, the event is not written, and timed logs a warning
+instead.
 
 Removing this record leaves timed running and measuring, and unable to
 act: `adjtimex` fails with `EPERM` and the clock is never steered. That is

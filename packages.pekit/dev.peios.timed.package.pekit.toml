@@ -27,4 +27,7 @@ sh                     = "*"
 ":usr/share/regim/timed-service.reg"      = "usr/share/regim/timed-service.reg"
 ":usr/share/regim/timed-policy.reg"       = "usr/share/regim/timed-policy.reg"
 ":usr/share/regman/timed.regman"          = "usr/share/regman/timed.regman"
+# The event manual for the one event timed writes, timed.clock.stepped, and
+# the clock fields it defines (PGSS §6.10).
+"@source:timed.evman"                     = "usr/share/evman/timed.evman"
 ":usr/share/man/man8/timed.8.gz"          = "usr/share/man/man8/timed.8.gz"

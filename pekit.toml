@@ -284,7 +284,7 @@ values = {
 }
 assert values["ImagePath"] == "/usr/sbin/timed"
 assert values["Identity"] == "Service"
-assert values["RequiredPrivileges"] == ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege"]
+assert values["RequiredPrivileges"] == ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege", "SeAuditPrivilege"]
 assert values["ExecStartPre"] == ["/usr/libexec/timed/prepare-state"]
 assert values["HookIdentity"] == "SYSTEM"
 assert values["Wants"] == ["trustd", "resolvd"]
