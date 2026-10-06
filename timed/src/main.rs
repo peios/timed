@@ -489,7 +489,7 @@ impl Timed {
             Step::Manual,
             previous,
             self.clock.now_nanos(),
-            caller.sid.as_ref().map(|sid| sid.as_bytes()),
+            Some(&caller.sid),
         );
         self.reference_time = self.clock.now_f64();
         // Someone who sets the clock is saying it is right, and saying so to
