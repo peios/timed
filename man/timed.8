@@ -16,6 +16,15 @@ that timestamp.  This conservative floor permits certificate validation on a
 machine with an absent or failed real-time clock; it is not considered a
 successful time synchronisation.
 .PP
+Every time it steps the clock rather than adjusting its rate \(em at that
+startup floor, on its own decision, or when asked to by
+.BR "clock set" " \(em"
+it writes a
+.B timed.clock.stepped
+event giving the clock's reading before and after, and for a requested set
+the SID of the caller.  The event is described in
+.BR /usr/share/evman/timed.evman .
+.PP
 Network Time Security is required by default.  Plain NTP is used only when an
 administrator explicitly enables it for a source.  Source selection requires
 agreement and rejects outliers rather than allowing a preferred source to

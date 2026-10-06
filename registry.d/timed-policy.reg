@@ -2,6 +2,12 @@
   "_comment": [
     "SeSystemtimePrivilege for timed, and for nothing else.",
     "",
+    "SeAuditPrivilege beside it, so that timed can write timed.clock.stepped",
+    "(timed.evman) when it steps the clock: a step changes every timestamp",
+    "written after it, and the record is how anyone reading the event store",
+    "later can tell. It lets the holder write KMES events under its own",
+    "kernel-stamped identity, nothing more.",
+    "",
     "authd unions the privileges of every SID on a token, and a service",
     "token carries the S-1-5-80 service SID derived from the service name.",
     "So a record named for that SID grants the privilege to this one",
@@ -34,7 +40,7 @@
         {
           "name": "Privileges",
           "type": "multi",
-          "data": ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege"]
+          "data": ["SeSystemtimePrivilege", "SeChangeNotifyPrivilege", "SeAuditPrivilege"]
         }
       ]
     }

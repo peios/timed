@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod clock;
 pub mod config;
 pub mod control;

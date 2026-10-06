@@ -1,0 +1,52 @@
+--- field clock.time
+type: uint.time
+
+The wall clock's reading just after timed moved it. Every record written
+after this one is stamped on the clock as it now reads, so this is the
+point from which their times count.
+
+Read just after the change, not computed from it, so it includes the few
+microseconds the change itself took.
+
+--- field clock.time-previous
+type: uint.time
+
+The wall clock's reading just before timed moved it, the counterpart of
+`clock.time`. The difference between the two is the size of the step, and
+records stamped between `clock.time-previous` and `clock.time` on either
+side of this one were not written in the order their times suggest.
+
+Absent when the clock read before the Unix epoch, which a `uint.time`
+cannot hold; that happens on a machine whose hardware clock has failed,
+and it is exactly the case the boot floor exists for.
+
+--- event timed.clock.stepped
+tier: essential
+gating: none — every step timed makes is recorded
+
+timed moved the system clock at once by an arbitrary amount, rather than
+adjusting its rate. Every timestamp written after this record is on the new
+clock, including the times of every other event in the store, so this is
+the record that explains a jump in them.
+
+timed slews small errors by adjusting the clock's rate after each poll, and
+those corrections are not recorded. Only a step is.
+
+field: operation.name                   required
+  values: automatic | manual | boot-floor
+  closed: true
+  Why timed stepped the clock. `automatic` is its own decision: its
+  sources agreed the clock was further off than it is willing to slew.
+  `manual` is a request on its control socket (`clock set`), which timed
+  accepts only while `Automatic` is 0. `boot-floor` is the clock raised to
+  the build's timestamp at startup, because it read earlier than that; the
+  real time is not yet known when this is written.
+field: clock.time                       required
+  Never before the build's timestamp: timed refuses a step that would land
+  there.
+field: clock.time-previous              optional
+field: subject.token.sid                optional
+  On a `manual` step, the user of the token that asked for the clock to be
+  set. Absent for an automatic step and for the boot floor, which timed
+  decides itself, and for a manual set whose caller's user could not be
+  read.
