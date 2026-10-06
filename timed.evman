@@ -45,8 +45,10 @@ field: clock.time                       required
   Never before the build's timestamp: timed refuses a step that would land
   there.
 field: clock.time-previous              optional
-field: subject.token.sid                optional
-  On a `manual` step, the user of the token that asked for the clock to be
-  set. Absent for an automatic step and for the boot floor, which timed
-  decides itself, and for a manual set whose caller's user could not be
-  read.
+field: subject.token.sid                required
+  The principal that acted. On a `manual` step, the user of the token that
+  asked for the clock to be set; timed refuses a request whose user it
+  cannot read. On an `automatic` step and the `boot-floor`, which timed
+  decides on its own authority, timed's own user: its service SID. Search
+  `operation.name`, not this field, to tell timed's own steps from a
+  person's.

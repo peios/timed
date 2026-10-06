@@ -12,7 +12,11 @@
 //! A record that cannot be written is a warning in the log, never a reason
 //! to leave the clock alone.
 
+use std::sync::OnceLock;
+
 use peios::msgpack::Writer;
+use peios::security::Sid;
+use peios::token::{Token, TokenAccess};
 
 use crate::log;
 
@@ -54,9 +58,10 @@ pub fn unix_nanos(seconds: i64, nanos: u32) -> Option<u64> {
 ///
 /// `previous` and `now` are the wall clock read just before and just after
 /// the step, as `uint.time`; either is left out when it has no value.
-/// `subject` is the binary SID of the caller who asked for a manual set;
-/// an automatic step and the boot floor are timed's own decisions and carry
-/// none.
+/// `subject` is the binary SID of the principal that acted (PGSS §6.4): the
+/// caller who asked for a manual set, or timed's own user for an automatic
+/// step and the boot floor, which are its own decisions. It is left out only
+/// if that SID could not be read.
 pub fn clock_stepped_payload(
     step: Step,
     previous: Option<u64>,
@@ -91,9 +96,35 @@ pub fn clock_stepped_payload(
     w.to_bytes()
 }
 
-/// Write a `timed.clock.stepped` record. Failure is logged, not returned:
-/// the clock has already moved, and nothing the caller could do differs.
-pub fn clock_stepped(step: Step, previous: Option<u64>, now: Option<u64>, subject: Option<&[u8]>) {
+/// The user SID of timed's own token, read once: the subject of every step
+/// timed takes on its own authority. `None`, with an error logged once, if
+/// it cannot be read.
+pub fn own_sid() -> Option<&'static Sid> {
+    static OWN: OnceLock<Option<Sid>> = OnceLock::new();
+    OWN.get_or_init(
+        || match Token::open_self(true, TokenAccess::QUERY).and_then(|t| t.user()) {
+            Ok(sid) => Some(sid),
+            Err(e) => {
+                log::error(format_args!(
+                    "could not read timed's own identity ({e}); its steps are recorded \
+                     without a subject"
+                ));
+                None
+            }
+        },
+    )
+    .as_ref()
+}
+
+/// Write a `timed.clock.stepped` record. `caller` is who asked, for a
+/// manual set; `None` means timed acted on its own authority, and the
+/// record names timed. Failure is logged, not returned: the clock has
+/// already moved, and nothing the caller could do differs.
+pub fn clock_stepped(step: Step, previous: Option<u64>, now: Option<u64>, caller: Option<&Sid>) {
+    let subject = match caller {
+        Some(sid) => Some(sid.as_bytes()),
+        None => own_sid().map(|sid| sid.as_bytes()),
+    };
     let result = clock_stepped_payload(step, previous, now, subject)
         .and_then(|payload| peios::event::emit(CLOCK_STEPPED, &payload));
     if let Err(e) = result {
@@ -153,14 +184,29 @@ mod tests {
     }
 
     #[test]
-    fn an_automatic_step_carries_both_times_and_no_subject() {
-        let bytes =
-            clock_stepped_payload(Step::Automatic, Some(1_000), Some(5_000_000_000), None).unwrap();
+    fn an_automatic_step_carries_both_times_and_timeds_own_sid() {
+        // A service SID shape: S-1-5-80-…, as timed's own user would be.
+        let own = [
+            1u8, 5, 0, 0, 0, 0, 0, 5, 80, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0,
+        ];
+        let bytes = clock_stepped_payload(
+            Step::Automatic,
+            Some(1_000),
+            Some(5_000_000_000),
+            Some(&own),
+        )
+        .unwrap();
         let v = parse(&bytes);
         assert_eq!(at(&v, "operation.name"), Some(&V::Str("automatic".into())));
         assert_eq!(at(&v, "clock.time"), Some(&V::Uint(5_000_000_000)));
         assert_eq!(at(&v, "clock.time-previous"), Some(&V::Uint(1_000)));
-        assert_eq!(at(&v, "subject"), None);
+        assert_eq!(at(&v, "subject.token.sid"), Some(&V::Bin(own.to_vec())));
+    }
+
+    #[test]
+    fn a_subject_that_could_not_be_read_is_left_out_rather_than_written_empty() {
+        let bytes = clock_stepped_payload(Step::Automatic, Some(1), Some(2), None).unwrap();
+        assert_eq!(at(&parse(&bytes), "subject"), None);
     }
 
     #[test]
