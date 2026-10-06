@@ -304,8 +304,8 @@ dependencies = [
 
 [[package]]
 name = "libnetd"
-version = "0.1.5"
-source = "git+https://github.com/peios/netd.git?rev=12543fbdf14475f30679665246714e1c7e3fa37f#12543fbdf14475f30679665246714e1c7e3fa37f"
+version = "0.1.7"
+source = "git+https://github.com/peios/netd.git?rev=e18bd847325c10f99f01a341f31ef6fe89ee1d14#e18bd847325c10f99f01a341f31ef6fe89ee1d14"
 dependencies = [
  "peios",
 ]
@@ -313,7 +313,7 @@ dependencies = [
 [[package]]
 name = "libresolv"
 version = "0.1.5"
-source = "git+https://github.com/peios/resolvd.git?rev=05443509f779c19ef2452362f832d0d6bd3aca94#05443509f779c19ef2452362f832d0d6bd3aca94"
+source = "git+https://github.com/peios/resolvd.git?rev=1091520f3c5f97c53b541d1477e05d839a8eb679#1091520f3c5f97c53b541d1477e05d839a8eb679"
 
 [[package]]
 name = "libtimed"
@@ -325,7 +325,7 @@ dependencies = [
 [[package]]
 name = "libtrust"
 version = "0.1.5"
-source = "git+https://github.com/peios/trustd.git?rev=7ba20f85263f566677d3773f92e41031c50b2eff#7ba20f85263f566677d3773f92e41031c50b2eff"
+source = "git+https://github.com/peios/trustd.git?rev=f0860ecc34f1fde15a5cd1594f5bbcc458653932#f0860ecc34f1fde15a5cd1594f5bbcc458653932"
 dependencies = [
  "peios",
 ]
@@ -374,7 +374,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "peios"
 version = "0.4.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35#2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35"
+source = "git+https://github.com/peios/peios-rs.git?rev=02c87cb643c30eef6b74cd1d9d8b0ae067bed69a#02c87cb643c30eef6b74cd1d9d8b0ae067bed69a"
 dependencies = [
  "bitflags",
  "libc",
@@ -384,7 +384,7 @@ dependencies = [
 [[package]]
 name = "peios-sys"
 version = "0.3.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35#2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35"
+source = "git+https://github.com/peios/peios-rs.git?rev=02c87cb643c30eef6b74cd1d9d8b0ae067bed69a#02c87cb643c30eef6b74cd1d9d8b0ae067bed69a"
 dependencies = [
  "bindgen",
  "pkg-config",
