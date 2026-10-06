@@ -161,11 +161,9 @@ struct Timed {
     /// Monotonic time to next attempt the roots.
     roots_after: f64,
     started: Instant,
-    /// The `TimeZone` value last acted on, so a registry write that changed
-    /// something else does not re-link the zone.
-    zone_wanted: Option<Option<String>>,
-    /// The zone `/etc/localtime` names, as last made. `None` is UTC.
-    zone: Option<String>,
+    /// The zone `/etc/localtime` holds, and a `TimeZone` value that could
+    /// not be put there.
+    zone: localtime::Keeper,
 }
 
 impl Timed {
@@ -221,8 +219,9 @@ impl Timed {
             roots_after: 0.0,
             config,
             started: now,
-            zone_wanted: None,
-            zone: None,
+            // What is there already: if `TimeZone` names a zone that cannot
+            // be used, this is what stays in force.
+            zone: localtime::Keeper::new(localtime::in_force()),
         }
     }
 
@@ -255,6 +254,9 @@ impl Timed {
             self.netd.maintain(Instant::now());
             self.absorb_netd();
             self.check_registry();
+            if self.zone.due(now) {
+                self.apply_zone();
+            }
             self.collect_work();
             self.ensure_roots(now);
             self.maintain_sources(now);
@@ -443,24 +445,23 @@ impl Timed {
         self.rebuild_sources();
     }
 
-    /// Put `TimeZone` in place, when it has changed since last time.
+    /// Put `TimeZone` in place, unless it was put in place last time. A
+    /// value that was refused is tried again on every call: on each
+    /// registry change, and every `localtime::RETRY` seconds from `run`.
     fn apply_zone(&mut self) {
-        if self.zone_wanted.as_ref() == Some(&self.config.time_zone) {
-            return;
-        }
-        self.zone_wanted = Some(self.config.time_zone.clone());
-        match localtime::render(self.config.time_zone.as_deref()) {
-            Ok(zone) => {
-                log::info(format_args!(
-                    "the time zone is {}",
-                    zone.as_deref().unwrap_or(localtime::DEFAULT)
-                ));
-                self.zone = zone;
-            }
-            Err(why) => log::warn(format_args!(
-                "TimeZone: {why}; staying on {}",
-                self.zone.as_deref().unwrap_or(localtime::DEFAULT)
+        let now = self.monotonic();
+        let outcome = self
+            .zone
+            .apply(&self.config.time_zone, now, localtime::render);
+        let in_force = self.zone.in_force.as_deref().unwrap_or(localtime::DEFAULT);
+        match outcome {
+            localtime::Outcome::Applied => log::info(format_args!("the time zone is {in_force}")),
+            localtime::Outcome::Refused(why) => log::warn(format_args!(
+                "TimeZone: {why}; staying on {in_force}, and trying again when the \
+                 registry changes and every {} minutes",
+                localtime::RETRY / 60.0
             )),
+            localtime::Outcome::Unchanged | localtime::Outcome::RefusedAgain => {}
         }
     }
 
@@ -1172,7 +1173,7 @@ impl Timed {
                 .count() as u32,
             floor: timed::clock::BUILD_EPOCH,
             manual: !self.config.automatic,
-            zone: self.zone.clone(),
+            zone: self.zone.in_force.clone(),
         }
     }
 
