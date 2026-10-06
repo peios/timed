@@ -44,10 +44,10 @@ pub const TIMED_RUN_DIR: &str = "/run/timed";
 /// The control socket.
 pub const SOCKET_PATH: &str = "/run/timed/time.sock";
 
-/// Durable state: the drift file and the NTS cookie store. A pre-start hook
-/// running as SYSTEM creates it with a descriptor naming timed's service
-/// SID, because timed itself is not privileged enough to make a directory
-/// under `/var/state`.
+/// Durable state: the drift file, the NTS cookie store and the name of the
+/// zone in `/etc/localtime`. A pre-start hook running as SYSTEM creates it
+/// with a descriptor naming timed's service SID, because timed itself is
+/// not privileged enough to make a directory under `/var/state`.
 pub const STATE_DIR: &str = "/var/state/timed";
 /// The learned frequency, one line of text. Worth a great deal: a machine
 /// that remembers its crystal was 12 ppm fast is within milliseconds an
@@ -58,6 +58,11 @@ pub const DRIFT_FILE: &str = "/var/state/timed/drift";
 /// set — which on a machine whose clock is wrong is precisely the handshake
 /// most likely to fail.
 pub const COOKIE_DIR: &str = "/var/state/timed/cookies";
+/// The name of the zone timed last put in [`LOCALTIME`], empty for UTC
+/// with none chosen. The copy carries no name of its own, and a timed that
+/// restarts while `TimeZone` names a zone it cannot use still has to say
+/// which zone is in force.
+pub const ZONE_FILE: &str = "/var/state/timed/zone";
 
 /// The registry subtree timed reads.
 pub const TIME_KEY: &str = "Machine\\System\\Time";

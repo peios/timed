@@ -214,8 +214,10 @@ Programs already running pick the new zone up the next time they look,
 which for most is the next time they show a time.
 
 A name tzdata does not have is refused and logged, and the machine stays
-on the zone it was on; `clock status` shows the zone in force. Absent is
-UTC.
+on the zone it was on; `clock status` shows the zone in force, across a
+restart of timed too. A refused name is tried again whenever a value
+under `Machine\System\Time` changes and every ten minutes, so a zone a tzdata upgrade adds is taken
+up without the value being written again. Absent is UTC.
 
 There is one zone for the whole machine. Times are stored and exchanged
 in UTC throughout Peios; this is only how they are shown.

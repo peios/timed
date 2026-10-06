@@ -57,6 +57,17 @@ Persisted learned oscillator frequency.
 Persisted NTS cookies.  This directory is private to SYSTEM,
 Administrators, and timed's service SID.
 .TP
+.B /var/state/timed/zone
+The name of the zone timed last put in
+.BR /etc/localtime ,
+which carries no name of its own.  Believed at start only while
+.B /etc/localtime
+is still a copy of that zone's file, so that
+.B clock status
+names the zone in force even when
+.B TimeZone
+names one timed cannot use.
+.TP
 .B /etc/localtime
 The machine's time zone, from
 .BR "Machine\\System\\Time TimeZone" :
