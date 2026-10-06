@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "clock"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "libc",
  "libtimed",
@@ -317,7 +317,7 @@ source = "git+https://github.com/peios/resolvd.git?rev=1091520f3c5f97c53b541d147
 
 [[package]]
 name = "libtimed"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "peios",
 ]
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "ntp"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "aes-siv",
 ]
@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "timed"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "libc",
  "libnetd",
