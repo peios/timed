@@ -1,6 +1,6 @@
-//! Lines on stderr, mirrored to the kernel log.
+//! Informational lines on stdout, warnings/errors on stderr, mirrored to kmsg.
 //!
-//! peinit captures stderr and forwards it to eventd, which is where these
+//! peinit captures both streams and forwards them to eventd, which is where these
 //! lines actually end up and how to read them:
 //!
 //! ```sh
@@ -30,7 +30,11 @@ fn kmsg() -> Option<&'static std::fs::File> {
 
 fn emit(level: &str, args: Arguments<'_>) {
     let line = format!("timed: {level}: {args}\n");
-    let _ = std::io::stderr().write_all(line.as_bytes());
+    if level == "info" {
+        let _ = std::io::stdout().write_all(line.as_bytes());
+    } else {
+        let _ = std::io::stderr().write_all(line.as_bytes());
+    }
     if let Some(mut k) = kmsg() {
         // One write per record: kmsg turns every write(2) into a line, so the
         // text is assembled first rather than streamed piecewise.
