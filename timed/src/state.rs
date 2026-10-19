@@ -24,14 +24,13 @@
 //! second time, after the build floor has broken it once.
 
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use libtimed::{COOKIE_DIR, DRIFT_FILE, STATE_DIR};
 use ntp::nts::{COOKIE_TARGET, MAX_COOKIE};
+use timed_core::{COOKIE_DIR, DRIFT_FILE, STATE_DIR, files};
 
 use crate::discipline::MAX_FREQUENCY;
-use crate::log;
+use crate::{log, state_file};
 
 /// Read the remembered frequency, in seconds per second.
 ///
@@ -39,7 +38,7 @@ use crate::log;
 /// clamped: a corrupt drift file should make the machine converge from
 /// scratch, not converge towards whatever the corruption happened to say.
 pub fn read_drift() -> Option<f64> {
-    let text = fs::read_to_string(DRIFT_FILE).ok()?;
+    let text = files::read_text(Path::new(DRIFT_FILE), 128).ok()?;
     let ppm: f64 = text.trim().parse().ok()?;
     if !ppm.is_finite() || ppm.abs() > MAX_FREQUENCY * 1e6 {
         log::warn(format_args!(
@@ -59,14 +58,8 @@ pub fn write_drift(frequency: f64) -> std::io::Result<()> {
     if !frequency.is_finite() {
         return Ok(());
     }
-    let path = Path::new(DRIFT_FILE);
-    let temporary = path.with_extension("new");
-    {
-        let mut file = fs::File::create(&temporary)?;
-        writeln!(file, "{:.3}", frequency * 1e6)?;
-        file.sync_all()?;
-    }
-    fs::rename(&temporary, path)
+    let text = format!("{:.3}\n", frequency * 1e6);
+    state_file::replace(Path::new(DRIFT_FILE), text.as_bytes())
 }
 
 fn cookie_path(name: &str) -> PathBuf {
@@ -97,7 +90,7 @@ fn cookie_path(name: &str) -> PathBuf {
 /// depends on that claim is one that breaks badly when it turns out to be
 /// wrong.
 pub fn read_cookies(name: &str) -> Vec<Vec<u8>> {
-    let Ok(bytes) = fs::read(cookie_path(name)) else {
+    let Ok(bytes) = files::read(&cookie_path(name), COOKIE_TARGET * (MAX_COOKIE + 2)) else {
         return Vec::new();
     };
     let mut out = Vec::new();
@@ -120,7 +113,6 @@ pub fn read_cookies(name: &str) -> Vec<Vec<u8>> {
 pub fn write_cookies(name: &str, cookies: &[Vec<u8>]) -> std::io::Result<()> {
     fs::create_dir_all(COOKIE_DIR)?;
     let path = cookie_path(name);
-    let temporary = path.with_extension("new");
     let mut bytes = Vec::new();
     for cookie in cookies.iter().take(COOKIE_TARGET) {
         if cookie.is_empty() || cookie.len() > MAX_COOKIE {
@@ -129,20 +121,9 @@ pub fn write_cookies(name: &str, cookies: &[Vec<u8>]) -> std::io::Result<()> {
         bytes.extend_from_slice(&(cookie.len() as u16).to_be_bytes());
         bytes.extend_from_slice(cookie);
     }
-    {
-        let mut file = fs::File::create(&temporary)?;
-        file.write_all(&bytes)?;
-        file.sync_all()?;
-    }
-    // Cookies are not quite secrets — spending one gets an unauthenticated
-    // observer nothing without the AEAD keys, which are never written down
-    // — but they are linkable to this machine, so they are not world
-    // readable either.
-    let _ = fs::set_permissions(
-        &temporary,
-        std::os::unix::fs::PermissionsExt::from_mode(0o600),
-    );
-    fs::rename(&temporary, path)
+    // The exclusive staging file is private from creation, including while
+    // it contains these linkable cookies.
+    state_file::replace(&path, &bytes)
 }
 
 /// Forget a source's cookies, when they have been rejected.

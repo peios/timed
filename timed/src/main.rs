@@ -11,14 +11,13 @@
 //! NTS needs TLS, TLS needs a plausible clock, and the clock is what we are
 //! trying to establish.
 //!
-//! 1. **Raise the clock to the build floor.** Every certificate in the
-//!    shipped trust store was valid at that moment, so TLS can work from
-//!    here even on a machine whose RTC is dead and reading 1970.
-//! 2. **Fetch the roots from trustd**, so a distrusted CA is distrusted
-//!    here too, without timed needing to be restarted.
-//! 3. **Resolve the sources through resolvd**, keeping the canonical name —
-//!    `1.time.peios.org` is a CNAME to `nts.netnod.se`, and it is Netnod's
-//!    certificate that will arrive.
+//! 1. **Read configuration and raise the clock to its recorded source floor.**
+//!    The floor helps bootstrap a machine whose RTC reads 1970; it is not
+//!    verified current time or a guarantee that certificates will validate.
+//! 2. **Fetch server-authentication roots from trustd.** Roots are refreshed
+//!    after handshake failures; timed does not subscribe to trust changes.
+//! 3. **Resolve sources through resolvd.** Addresses choose the destination;
+//!    the configured hostname remains the certificate identity.
 //! 4. **NTS-KE**, once per source, yielding cookies and keys.
 //! 5. **Poll**, and only now is there anything to set the clock from.
 //!
@@ -26,16 +25,18 @@
 //! trustd or the network converges correctly a few seconds later; one that
 //! gave up would need a restart nobody would think to perform.
 
+mod notification;
+
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::os::fd::{AsRawFd, RawFd};
-use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use libtimed::{Auth, Origin, Reply, Request, SourceInfo, SourceState, Sync};
 use ntp::{MAX_PACKET, NtpTimestamp, ReferenceId};
 use rustls::ClientConfig;
+use timed_core::{Auth, Origin, Reply, Request, SourceInfo, SourceState, Sync};
 
 use timed::audit::{self, Step};
 use timed::clock::{Clock, Leap, Steering};
@@ -48,7 +49,7 @@ use timed::netd_link::NetdLink;
 use timed::select::{self, Candidate, NoSelection};
 use timed::source::{BURST, Rejected, Security, Source};
 use timed::state;
-use timed::worker::{Done, Job, Worker};
+use timed::worker::{Done, Job, SourceId, Worker};
 use timed::{log, resolve};
 
 /// How often the learned frequency is written back, in seconds. Often
@@ -69,6 +70,14 @@ fn main() {
     // A daemon that dies on SIGPIPE because a subscriber closed a socket is
     // a daemon that stops keeping the clock for everyone else.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_IGN) };
+
+    let config = match config::load() {
+        Ok(config) => config,
+        Err(error) => {
+            log::error(format_args!("reading configuration: {error}"));
+            std::process::exit(1);
+        }
+    };
 
     let clock = Clock;
     let before = clock.now_nanos();
@@ -94,27 +103,26 @@ fn main() {
         }
     };
 
-    let mut timed = Timed::new(clock, listener);
+    let mut timed = Timed::new(clock, listener, config);
     timed.run();
 }
 
 /// One polled server, plus everything timed knows about it beyond the
 /// protocol state that [`Source`] holds.
 struct Entry {
+    id: SourceId,
     source: Source,
     spec: ServerSpec,
     origin: Origin,
     /// Addresses the name resolved to, tried in turn.
     addresses: Vec<SocketAddr>,
-    /// The canonical name, for the certificate.
-    canonical: String,
     /// Monotonic time after which the source needs a fresh handshake.
     rekey_after: f64,
     /// Monotonic time of the next attempt at whatever it needs next.
     retry_after: f64,
     /// A job is with the worker for this source. Exactly one at a time:
-    /// that bounds the work without needing a pool, and means a slow
-    /// server delays only its own source.
+    /// this prevents duplicate jobs for the current association. The
+    /// serial network worker can still delay jobs for other sources.
     in_flight: bool,
     /// Where it stood in the last selection.
     state: SourceState,
@@ -123,6 +131,87 @@ struct Entry {
     /// the filter already held refreshes the dispersion but must not be
     /// fed to the loop a second time.
     fresh: bool,
+}
+
+impl Entry {
+    fn new(spec: ServerSpec, origin: Origin, min_poll: i8, max_poll: i8) -> Self {
+        let security = if spec.unauthenticated {
+            Security::Unauthenticated
+        } else {
+            Security::NtsPending
+        };
+        let source = Source::new(
+            spec.host.clone(),
+            // A placeholder until the name resolves; nothing is sent
+            // to it, because `addresses` being empty is what gates
+            // polling.
+            SocketAddr::from(([0, 0, 0, 0], 123)),
+            security,
+            min_poll,
+            max_poll,
+        );
+        Entry {
+            id: SourceId::default(),
+            source,
+            spec,
+            origin,
+            addresses: Vec::new(),
+            rekey_after: 0.0,
+            retry_after: 0.0,
+            in_flight: false,
+            state: SourceState::Unreachable,
+            fresh: false,
+        }
+    }
+
+    fn can_reuse(&self, spec: &ServerSpec) -> bool {
+        self.spec.host == spec.host
+            && self.spec.port == spec.port
+            && self.spec.unauthenticated == spec.unauthenticated
+    }
+}
+
+fn source_index(entries: &[Entry], id: &SourceId) -> Option<usize> {
+    entries.iter().position(|entry| entry.id.matches(id))
+}
+
+fn reconfigure_entries(
+    previous: Vec<Entry>,
+    specs: Vec<ServerSpec>,
+    origin: Origin,
+    min_poll: i8,
+    max_poll: i8,
+    allow_unauthenticated: bool,
+) -> Vec<Entry> {
+    let mut entries = Vec::new();
+    let mut kept: HashMap<String, Entry> = HashMap::new();
+    for entry in previous {
+        kept.insert(entry.spec.host.clone(), entry);
+    }
+
+    for spec in specs {
+        if spec.unauthenticated && !allow_unauthenticated {
+            log::warn(format_args!(
+                "{}: marked unauthenticated but AllowUnauthenticated is 0; not used",
+                spec.host
+            ));
+            continue;
+        }
+        if let Some(mut entry) = kept.remove(&spec.host)
+            && entry.can_reuse(&spec)
+        {
+            entry.spec = spec;
+            entry.origin = origin;
+            entries.push(entry);
+            continue;
+        }
+        entries.push(Entry::new(spec, origin, min_poll, max_poll));
+    }
+
+    for (host, _) in kept {
+        log::info(format_args!("{host}: no longer configured"));
+    }
+    entries
 }
 
 struct Timed {
@@ -172,8 +261,7 @@ struct Timed {
 }
 
 impl Timed {
-    fn new(clock: Clock, listener: UnixListener) -> Timed {
-        let config = config::load();
+    fn new(clock: Clock, listener: UnixListener, config: Config) -> Timed {
         let precision = clock.precision();
         let drift = state::read_drift();
         if let Some(f) = drift {
@@ -185,7 +273,7 @@ impl Timed {
         if !state::state_available() {
             log::warn(format_args!(
                 "{} is missing; the frequency and NTS cookies will not survive a reboot",
-                libtimed::STATE_DIR
+                timed_core::STATE_DIR
             ));
         }
 
@@ -306,57 +394,19 @@ impl Timed {
         // has not changed. Restarting every source on every registry write
         // would make a `reg set` cost the machine several minutes of
         // accuracy.
-        let mut kept: HashMap<String, Entry> = HashMap::new();
-        for entry in self.entries.drain(..) {
-            kept.insert(entry.spec.host.clone(), entry);
-        }
-
-        for spec in specs {
-            if spec.unauthenticated && !self.config.allow_unauthenticated {
-                log::warn(format_args!(
-                    "{}: marked unauthenticated but AllowUnauthenticated is 0; not used",
-                    spec.host
-                ));
-                continue;
-            }
-            if let Some(mut entry) = kept.remove(&spec.host) {
-                entry.spec = spec;
-                entry.origin = origin;
-                self.entries.push(entry);
-                continue;
-            }
-            let security = if spec.unauthenticated {
-                Security::Unauthenticated
-            } else {
-                Security::NtsPending
-            };
-            let source = Source::new(
-                spec.host.clone(),
-                // A placeholder until the name resolves; nothing is sent
-                // to it, because `addresses` being empty is what gates
-                // polling.
-                SocketAddr::from(([0, 0, 0, 0], 123)),
-                security,
-                self.config.min_poll,
-                self.config.max_poll,
-            );
-            self.entries.push(Entry {
-                canonical: spec.host.clone(),
-                source,
-                spec,
-                origin,
-                addresses: Vec::new(),
-                rekey_after: 0.0,
-                retry_after: 0.0,
-                in_flight: false,
-                state: SourceState::Unreachable,
-                fresh: false,
-            });
-        }
-
-        for (host, _) in kept {
-            log::info(format_args!("{host}: no longer configured"));
-        }
+        let old_peer = self
+            .system_peer
+            .and_then(|index| self.entries.get(index))
+            .map(|entry| entry.id.clone());
+        self.entries = reconfigure_entries(
+            std::mem::take(&mut self.entries),
+            specs,
+            origin,
+            self.config.min_poll,
+            self.config.max_poll,
+            self.config.allow_unauthenticated,
+        );
+        self.system_peer = old_peer.and_then(|id| source_index(&self.entries, &id));
         log::info(format_args!(
             "{} source(s) from {}",
             self.entries.len(),
@@ -427,12 +477,15 @@ impl Timed {
         log::info(format_args!(
             "the registry changed; re-reading configuration"
         ));
-        self.reload();
+        if let Err(error) = self.reload() {
+            log::warn(format_args!("keeping previous configuration: {error}"));
+        }
     }
 
-    fn reload(&mut self) {
+    fn reload(&mut self) -> std::io::Result<()> {
         let was_automatic = self.config.automatic;
-        self.config = config::load();
+        let config = config::load()?;
+        self.config = config;
         self.control = ControlObject::new(self.config.control_security.as_deref());
         self.registry_watch = config::watch().ok();
         if self.config.automatic && !was_automatic {
@@ -448,6 +501,7 @@ impl Timed {
         }
         self.apply_zone();
         self.rebuild_sources();
+        Ok(())
     }
 
     /// Put `TimeZone` in place, unless it was put in place last time. A
@@ -608,7 +662,7 @@ impl Timed {
                 let entry = &mut self.entries[index];
                 entry.in_flight = true;
                 let job = Job::Resolve {
-                    index,
+                    source_id: entry.id.clone(),
                     host: entry.spec.host.clone(),
                     port: entry.spec.port.unwrap_or(ntp::nts::DEFAULT_NTP_PORT),
                 };
@@ -629,9 +683,8 @@ impl Timed {
             // The KE port is not the NTP port the addresses carry.
             let ke_port = entry.spec.port.unwrap_or(ntp::nts::DEFAULT_KE_PORT);
             let job = Job::Handshake {
-                index,
+                source_id: entry.id.clone(),
                 host: entry.spec.host.clone(),
-                canonical: entry.canonical.clone(),
                 ke_addresses: entry
                     .addresses
                     .iter()
@@ -654,10 +707,10 @@ impl Timed {
                     self.tls = Some(config);
                 }
                 Done::Roots(Err(e)) => log::warn(format_args!("no root store yet ({e}); retrying")),
-                Done::Resolved { index, result } => {
-                    if index >= self.entries.len() {
+                Done::Resolved { source_id, result } => {
+                    let Some(index) = source_index(&self.entries, &source_id) else {
                         continue;
-                    }
+                    };
                     self.entries[index].in_flight = false;
                     match result {
                         Ok(resolved) => {
@@ -681,7 +734,6 @@ impl Timed {
                             let entry = &mut self.entries[index];
                             entry.source.address = addresses[0];
                             entry.addresses = addresses;
-                            entry.canonical = resolved.canonical;
                             entry.retry_after = 0.0;
                         }
                         Err(e) => {
@@ -690,10 +742,10 @@ impl Timed {
                         }
                     }
                 }
-                Done::Handshook { index, result } => {
-                    if index >= self.entries.len() {
+                Done::Handshook { source_id, result } => {
+                    let Some(index) = source_index(&self.entries, &source_id) else {
                         continue;
-                    }
+                    };
                     self.entries[index].in_flight = false;
                     match result {
                         Ok((established, addresses)) => {
@@ -706,7 +758,7 @@ impl Timed {
                             log::info(format_args!(
                                 "{}: NTS-KE with {} succeeded; {} cookie(s), NTP at {}",
                                 self.entries[index].spec.host,
-                                self.entries[index].canonical,
+                                self.entries[index].spec.host,
                                 cookies.len(),
                                 addresses[0]
                             ));
@@ -1160,9 +1212,9 @@ impl Timed {
         }
     }
 
-    fn status(&self) -> libtimed::Status {
+    fn status(&self) -> timed_core::Status {
         let now = self.monotonic();
-        libtimed::Status {
+        timed_core::Status {
             generation: self.generation,
             sync: self.sync_state(),
             system_peer: self.system_peer.map(|i| self.entries[i].spec.host.clone()),
@@ -1241,9 +1293,9 @@ impl Timed {
             .collect()
     }
 
-    fn snapshot(&self) -> libtimed::Snapshot {
+    fn snapshot(&self) -> timed_core::Snapshot {
         let synchronised = self.discipline.is_synchronised() && self.system_peer.is_some();
-        libtimed::Snapshot {
+        timed_core::Snapshot {
             generation: self.generation,
             leap: match self.leap {
                 Leap::None => 0,
@@ -1320,7 +1372,7 @@ impl Timed {
                 Request::Sources => {
                     let all = self.sources();
                     let chunks: Vec<&[SourceInfo]> =
-                        all.chunks(libtimed::SOURCES_PER_CHUNK).collect();
+                        all.chunks(timed_core::SOURCES_PER_CHUNK).collect();
                     if chunks.is_empty() {
                         let _ = control::write_reply(
                             &mut stream,
@@ -1347,8 +1399,13 @@ impl Timed {
                     }
                 }
                 Request::Reload => {
+                    if let Err(error) = self.reload() {
+                        let message = format!("keeping previous configuration: {error}");
+                        log::warn(format_args!("{message}"));
+                        let _ = control::write_reply(&mut stream, &Reply::Error(message));
+                        continue;
+                    }
                     let _ = control::write_reply(&mut stream, &Reply::Ok);
-                    self.reload();
                     let now = self.monotonic();
                     for entry in self.entries.iter_mut() {
                         entry.addresses.clear();
@@ -1453,7 +1510,7 @@ fn is_link_local_v6(a: std::net::Ipv6Addr) -> bool {
 /// clock nobody has checked should be able to say so, and until now
 /// nothing could wait on it. It travels on the notify socket timed
 /// already has rather than over timed's own control socket, so PID 1
-/// needs no knowledge of libtimed and no subscription to maintain.
+/// needs no knowledge of timed_core and no subscription to maintain.
 ///
 /// Sent on change only. The channel is lossy and unacknowledged by design
 /// (PSPU §4.16), which is fine because a level is a statement of a
@@ -1473,16 +1530,13 @@ fn notify_ready() {
 }
 
 fn notify(payload: &[u8]) {
-    let Ok(path) = std::env::var("NOTIFY_SOCKET") else {
+    let Some(path) = std::env::var_os("NOTIFY_SOCKET") else {
         return;
     };
-    match UnixDatagram::unbound() {
-        Ok(s) => {
-            if let Err(e) = s.send_to(payload, &path) {
-                log::warn(format_args!("notify: {e}"));
-            }
-        }
-        Err(e) => log::warn(format_args!("notify: {e}")),
+    if let Err(error) =
+        notification::send(std::path::Path::new(&path), payload, Duration::from_secs(1))
+    {
+        log::warn(format_args!("notify: {error}"));
     }
 }
 
@@ -1490,4 +1544,70 @@ fn bind(address: &str) -> Option<UdpSocket> {
     let socket = UdpSocket::bind(address).ok()?;
     socket.set_nonblocking(true).ok()?;
     Some(socket)
+}
+
+#[cfg(test)]
+mod source_identity_tests {
+    use super::*;
+
+    fn entry(host: &str) -> Entry {
+        Entry::new(ServerSpec::new(host), Origin::Fallback, 6, 10)
+    }
+
+    #[test]
+    fn pending_work_follows_its_source_after_reordering() {
+        let first = entry("first.example");
+        let second = entry("second.example");
+        let job = Job::Resolve {
+            source_id: first.id.clone(),
+            host: first.spec.host.clone(),
+            port: 123,
+        };
+        let Job::Resolve { source_id, .. } = job else {
+            unreachable!()
+        };
+        let entries = reconfigure_entries(
+            vec![first, second],
+            vec![
+                ServerSpec::new("second.example"),
+                ServerSpec::new("first.example"),
+            ],
+            Origin::Fallback,
+            6,
+            10,
+            false,
+        );
+        assert_eq!(source_index(&entries, &source_id), Some(1));
+        let entries = reconfigure_entries(
+            entries,
+            vec![ServerSpec::new("second.example")],
+            Origin::Fallback,
+            6,
+            10,
+            false,
+        );
+        assert_eq!(source_index(&entries, &source_id), None);
+        let entries = reconfigure_entries(
+            entries,
+            vec![ServerSpec::new("first.example")],
+            Origin::Fallback,
+            6,
+            10,
+            false,
+        );
+        assert_eq!(source_index(&entries, &source_id), None);
+    }
+
+    #[test]
+    fn port_or_authentication_changes_replace_the_association() {
+        let previous = entry("source.example");
+        let mut changed = previous.spec.clone();
+        changed.prefer = true;
+        assert!(previous.can_reuse(&changed));
+        changed.port = Some(4461);
+        assert!(!previous.can_reuse(&changed));
+        changed.port = previous.spec.port;
+        changed.unauthenticated = true;
+        assert!(!previous.can_reuse(&changed));
+    }
 }

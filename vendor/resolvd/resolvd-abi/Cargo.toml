@@ -1,0 +1,6 @@
+[package]
+name = "resolvd-abi"
+version = "0.1.6"
+edition = "2024"
+license = "MIT"
+publish = false

@@ -10,10 +10,10 @@
 //! It is called `clock` rather than `time` because `time` is a shell
 //! keyword: `time status` would run `status` and report how long it took.
 
-use std::os::unix::net::UnixStream;
 use std::process::ExitCode;
+use std::time::Duration;
 
-use libtimed::{Reply, Request, SOCKET_PATH, SourceState, Sync};
+use timed_core::{Reply, Request, SourceState, Sync};
 
 /// Done.
 const OK: u8 = 0;
@@ -70,17 +70,18 @@ fn main() -> ExitCode {
     ExitCode::from(code)
 }
 
-fn connect() -> Result<UnixStream, String> {
-    UnixStream::connect(SOCKET_PATH)
-        .map_err(|e| format!("cannot reach timed at {SOCKET_PATH}: {e}"))
+fn client() -> Result<timed_client::Client, String> {
+    timed_client::Client::system(Duration::from_secs(10)).map_err(|error| error.to_string())
 }
-
 fn ask(request: Request) -> Result<Reply, String> {
-    let mut stream = connect()?;
-    stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
-        .map_err(|e| e.to_string())?;
-    libtimed::call(&mut stream, &request).map_err(|e| e.to_string())
+    let client = client()?;
+    match request {
+        Request::Status => client.status().map(Reply::Status),
+        Request::Reload => client.reload().map(|()| Reply::Ok),
+        Request::Set { seconds, nanos } => client.set(seconds, nanos).map(|()| Reply::Ok),
+        _ => return Err("unsupported operator request".into()),
+    }
+    .map_err(|error| error.to_string())
 }
 
 fn fail(message: String) -> u8 {
@@ -196,33 +197,11 @@ fn status() -> u8 {
 }
 
 fn sources() -> u8 {
-    let mut stream = match connect() {
-        Ok(s) => s,
-        Err(e) => return fail(e),
-    };
-    if let Err(e) = libtimed::send(&mut stream, &Request::Sources.encode()) {
-        return fail(e.to_string());
-    }
-    let mut replies = Vec::new();
-    loop {
-        let bytes = match libtimed::recv(&mut stream) {
-            Ok(b) => b,
-            Err(e) => return fail(e.to_string()),
+    let sources =
+        match client().and_then(|client| client.sources().map_err(|error| error.to_string())) {
+            Ok(sources) => sources,
+            Err(error) => return fail(error),
         };
-        let reply = match Reply::decode(&bytes) {
-            Ok(r) => r,
-            Err(e) => return fail(e.to_string()),
-        };
-        let done = !matches!(&reply, Reply::Sources { more: true, .. });
-        replies.push(reply);
-        if done {
-            break;
-        }
-    }
-    let sources = match libtimed::sources_of(replies) {
-        Ok(s) => s,
-        Err(e) => return fail(e),
-    };
     if sources.is_empty() {
         println!("no sources configured");
         return ABSENT;

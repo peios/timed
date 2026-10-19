@@ -1,0 +1,22 @@
+[package]
+name = "netd-core"
+description = "netd's control wire — paths, readiness levels and the query codec — and the laws of its configuration."
+version = "0.1.8"
+edition = "2024"
+rust-version = "1.98.1"
+license = "MIT"
+publish = false
+
+[features]
+# The interface layer as netd builds and judges it, with PNP's rules engine.
+# A feature so that a client of the wire alone (resolvd) does not build the
+# engine.
+policy = ["dep:pnp-core"]
+
+[dependencies]
+peios = { workspace = true }
+pnp-core = { path = "../vendor/kernel/peios/rust/pnp-core", optional = true }
+
+[[test]]
+name = "policy_boundaries"
+required-features = ["policy"]

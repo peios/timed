@@ -1,0 +1,11 @@
+[package]
+name = "resolvd-client"
+version = "0.1.6"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+resolvd-core = { path = "../resolvd-core" }
+resolvd-abi = { path = "../resolvd-abi" }
+libc.workspace = true

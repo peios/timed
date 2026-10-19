@@ -11,5 +11,7 @@ name = "clock"
 path = "src/main.rs"
 
 [dependencies]
-libtimed = { path = "../libtimed" }
+timed-core = { path = "../timed-core" }
 libc = { workspace = true }
+
+timed-client = { path = "../timed-client" }

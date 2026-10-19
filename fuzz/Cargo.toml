@@ -11,7 +11,7 @@ cargo-fuzz = true
 libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
 arbitrary = { version = "1", features = ["derive"] }
 ntp = { path = "../ntp" }
-libtimed = { path = "../libtimed" }
+timed-core = { path = "../timed-core" }
 timed = { path = "../timed" }
 
 [[bin]]

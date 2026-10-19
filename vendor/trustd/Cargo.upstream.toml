@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = ["libtrust", "trust-client", "trust-abi", "trust-core", "trust-client-core", "trustd", "trust"]
+
+# trustd is its own workspace root, like netd and resolvd.
+#
+#   trust-core  the control wire: paths, rights, request/reply codec, the root
+#             record. No I/O, no policy.
+#   trustd    the daemon. Composes the shipped bundle with the registry's
+#             additions and distrusts, renders the compat files, serves the
+#             effective set on its socket.
+#   trust     the operator command. Reads over the socket, writes to the
+#             registry — the same path `reg` takes, so the key's descriptor
+#             is the only gate.
+
+[workspace.package]
+version = "0.1.6"
+edition = "2024"
+rust-version = "1.98.1"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+libc = "0.2"
+# Exact public binding revision shared with the qualified Eventd release.
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "26ac6968cec4cb7f887198aa3fb9268096660831", package = "peios" }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"

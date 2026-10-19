@@ -22,10 +22,11 @@
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::os::unix::fs::OpenOptionsExt;
 
-use libtimed::{LOCALTIME, ZONE_FILE, ZONEINFO_DIR, zone};
+use timed_core::{LOCALTIME, ZONE_FILE, ZONEINFO_DIR, files, zone};
 
-use crate::log;
+use crate::{log, state_file};
 
 /// What to name when nothing is chosen.
 pub const DEFAULT: &str = "UTC";
@@ -39,9 +40,7 @@ pub const RETRY: f64 = 600.0;
 /// `None` meaning UTC.
 pub fn render(wanted: Option<&str>) -> Result<Option<String>, String> {
     let name = wanted.unwrap_or(DEFAULT);
-    zone::installed(name)?;
-    let bytes = fs::read(zone::path(name))
-        .map_err(|e| format!("cannot read the time zone {name:?}: {e}"))?;
+    let bytes = zone::read(name)?;
     install(&bytes, Path::new(LOCALTIME))?;
     // After the copy, so the name is never one the copy has not reached;
     // and on every success, so a missing or stale name is put right.
@@ -55,18 +54,24 @@ pub fn render(wanted: Option<&str>) -> Result<Option<String>, String> {
 
 /// Make `localtime` hold `bytes`, unless it already does.
 fn install(bytes: &[u8], localtime: &Path) -> Result<(), String> {
-    if fs::read(localtime).is_ok_and(|current| current == bytes) {
+    if files::read(localtime, zone::MAX_ZONE_BYTES).is_ok_and(|current| current == bytes) {
         return Ok(());
     }
     // Opened without O_CREAT: the hook makes the file, and timed may not
-    // add one to /system/retc. One write after the truncate, so a program
-    // reading at the same moment finds the old zone, an empty file (which
-    // it takes as UTC), or the new zone, and never half of one.
+    // add one to /system/retc. Replacement is not atomic: readers can see
+    // an empty or partial file during copying, and a write failure can
+    // leave a partial copy. The permission model does not permit rename.
     fs::OpenOptions::new()
         .write(true)
-        .truncate(true)
+        .custom_flags(libc::O_NONBLOCK)
         .open(localtime)
-        .and_then(|mut file| file.write_all(bytes))
+        .and_then(|mut file| {
+            if !file.metadata()?.is_file() {
+                return Err(std::io::Error::other("localtime is not a regular file"));
+            }
+            file.set_len(0)?;
+            file.write_all(bytes)
+        })
         .map_err(|e| {
             format!(
                 "cannot write {}: {e} (timed's pre-start hook makes it)",
@@ -79,16 +84,10 @@ fn install(bytes: &[u8], localtime: &Path) -> Result<(), String> {
 /// Via a temporary file and a rename, as the drift file is.
 fn remember(wanted: Option<&str>, record: &Path) -> std::io::Result<()> {
     let text = wanted.unwrap_or("");
-    if fs::read_to_string(record).is_ok_and(|current| current == text) {
+    if files::read_text(record, zone::MAX_NAME).is_ok_and(|current| current == text) {
         return Ok(());
     }
-    let temporary = record.with_extension("new");
-    {
-        let mut file = fs::File::create(&temporary)?;
-        file.write_all(text.as_bytes())?;
-        file.sync_all()?;
-    }
-    fs::rename(&temporary, record)
+    state_file::replace(record, text.as_bytes())
 }
 
 /// The zone [`LOCALTIME`] holds now, `None` meaning UTC or not known.
@@ -109,12 +108,12 @@ pub fn in_force() -> Option<String> {
 /// (empty, which is UTC), or someone else wrote it. Anything that does not
 /// agree is not known, and not known is shown as UTC.
 fn identify(localtime: &Path, record: &Path, zoneinfo: &Path) -> Option<String> {
-    let name = fs::read_to_string(record).ok()?;
+    let name = files::read_text(record, zone::MAX_NAME).ok()?;
     // Only timed writes the record, but it is still a path's worth of text,
     // and nothing outside the database is read on its say-so.
     zone::check_name(&name).ok()?;
-    let held = fs::read(localtime).ok()?;
-    let file = fs::read(zoneinfo.join(&name)).ok()?;
+    let held = files::read(localtime, zone::MAX_ZONE_BYTES).ok()?;
+    let file = files::read(&zoneinfo.join(&name), zone::MAX_ZONE_BYTES).ok()?;
     (!held.is_empty() && held == file).then_some(name)
 }
 

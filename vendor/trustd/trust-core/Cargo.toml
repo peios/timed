@@ -1,0 +1,15 @@
+[package]
+name = "trust-core"
+description = "trustd's control wire: paths, rights, and the request/reply codec."
+version = "0.1.6"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+peios = { workspace = true }
+
+x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+der = "0.7"
+sha2 = "0.10"
+sha1 = "0.10"

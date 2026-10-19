@@ -1,3 +1,4 @@
+#!/bin/sh
 # Guest-side smoke test for timed. Run with
 #   dist/release/drive.py --no-disk --share <dir> --timeout 420 \
 #     --cmdline-extra 'loglevel=7 ignore_loglevel' \
@@ -13,83 +14,84 @@
 # No grep, sed or awk: the image ships peiosutils, a coreutils fork, and
 # has none of them.
 {
-  # Run with loglevel=7 if you want timed's own lines too — except that
-  # they will not appear, because /dev/kmsg is SYSTEM-only and timed is
-  # LocalService (PEI-581). Until that is fixed, the `note` column in
-  # `clock sources` is the in-band diagnostic, which is why it exists.
+    # Run with loglevel=7 if you want timed's own lines too — except that
+    # they will not appear, because /dev/kmsg is SYSTEM-only and timed is
+    # LocalService (PEI-581). Until that is fixed, the `note` column in
+    # `clock sources` is the in-band diagnostic, which is why it exists.
 
-  echo "== the clock as the kernel found it"
-  date
-  echo "(the RTC was set to 2020-01-01; if this reads 2026 then timed has"
-  echo " already raised it to the build floor, which is the first thing"
-  echo " it does and the reason TLS can work at all)"
+    echo "== the clock as the kernel found it"
+    date
+    echo "(the RTC was set to 2020-01-01; if this reads 2026 then timed has"
+    echo " already raised it to the build floor, which is the first thing"
+    echo " it does and the reason TLS can work at all)"
 
-  echo "== service"
-  svctl status timed | head -3
-  echo "-- the identity it actually got, and what it may do"
-  svctl status timed | head -8
+    echo "== service"
+    svctl status timed | head -3
+    echo "-- the identity it actually got, and what it may do"
+    svctl status timed | head -8
 
-  echo "== the state directory the pre-start hook made"
-  if [ -d /var/state/timed ]; then
-    echo "ok   /var/state/timed"
-    sd show /var/state/timed --sddl 2>&1 | head -2
-  else
-    echo "MISSING /var/state/timed"
-  fi
-  echo "-- the hook's own log"
-  cat /var/state/timed-prepare.log 2>&1 | tail -5
+    echo "== the state directory the pre-start hook made"
+    if [ -d /var/state/timed ]; then
+        echo "ok   /var/state/timed"
+        sd show /var/state/timed --sddl 2>&1 | head -2
+    else
+        echo "MISSING /var/state/timed"
+    fi
+    echo "-- the hook's own log"
+    cat /var/state/timed-prepare.log 2>&1 | tail -5
 
-  echo "== status at start"
-  clock status
+    echo "== status at start"
+    clock status
 
-  echo "== sources"
-  clock sources
+    echo "== sources"
+    clock sources
 
-  echo "== the registry holds the policy, and the defaults are the safe ones"
-  reg get 'Machine/System/Time'
-  echo "-- and the privilege grant that lets timed act"
-  reg ls 'Machine/Generic/Authn/Policy'
+    echo "== the registry holds the policy, and the defaults are the safe ones"
+    reg get 'Machine/System/Time'
+    echo "-- and the privilege grant that lets timed act"
+    reg ls 'Machine/Generic/Authn/Policy'
 
-  echo "== waiting for the first measurement (up to four minutes)"
-  # An NTS-KE handshake to a public server plus a poll. Slow, and worth
-  # waiting for: everything before this proves the machine can start, and
-  # only this proves it can tell the time.
-  i=0
-  while [ "$i" -lt 24 ]; do
-    sleep 10
-    i=$((i + 1))
-    STATE=$(clock status | head -2 | tail -1)
-    echo "  [$i] $STATE"
-    # "unsynchronised" contains "synchronised", so a *synchronised* glob
-    # matches the state we are waiting to leave and the loop exits at once.
-    # Match the two states that mean the clock is actually being steered.
-    case "$STATE" in
-      *"state        synchronised"*|*settling*|*spike*) break ;;
-    esac
-  done
+    echo "== waiting for the first measurement (up to four minutes)"
+    # An NTS-KE handshake to a public server plus a poll. Slow, and worth
+    # waiting for: everything before this proves the machine can start, and
+    # only this proves it can tell the time.
+    i=0
+    while [ "$i" -lt 24 ]; do
+        sleep 10
+        i=$((i + 1))
+        STATE=$(clock status | head -2 | tail -1)
+        echo "  [$i] $STATE"
+        # "unsynchronised" contains "synchronised", so a *synchronised* glob
+        # matches the state we are waiting to leave and the loop exits at once.
+        # Match the two states that mean the clock is actually being steered.
+        case "$STATE" in
+        *"state        synchronised"* | *settling* | *spike*) break ;;
+        esac
+    done
 
-  echo "== status after synchronising"
-  clock status
-  echo "== sources after synchronising"
-  clock sources
-  echo "== the clock now"
-  date
+    echo "== status after synchronising"
+    clock status
+    echo "== sources after synchronising"
+    clock sources
+    echo "== the clock now"
+    date
 
-  echo "== the drift file"
-  cat /var/state/timed/drift 2>&1
-  echo "== the cookie store (one file per NTS source)"
-  ls /var/state/timed/cookies 2>&1
+    echo "== the drift file"
+    cat /var/state/timed/drift 2>&1
+    echo "== the cookie store (one file per NTS source)"
+    ls /var/state/timed/cookies 2>&1
 
-  echo "== reload is gated, query is not"
-  clock reload; echo "exit=$?"
+    echo "== reload is gated, query is not"
+    clock reload
+    echo "exit=$?"
 
-  echo "== a bad configuration is refused rather than silently ignored"
-  reg set Machine/System/Time Servers multi:'time.example.org prefered'
-  sleep 3
-  clock sources
-  reg del Machine/System/Time Servers
-  sleep 3
+    echo "== a bad configuration is refused rather than silently ignored"
+    reg set Machine/System/Time Servers multi:'time.example.org prefered'
+    sleep 3
+    clock sources
+    reg del Machine/System/Time Servers
+    sleep 3
 
-  echo "== final status"
-  clock status
-} > /share/timed-report.txt 2>&1
+    echo "== final status"
+    clock status
+} >/share/timed-report.txt 2>&1

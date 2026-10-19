@@ -28,11 +28,22 @@ use crate::nts_ke::{self, Established};
 use crate::resolve::{self, Resolved};
 use crate::{log, trust};
 
+/// Identity of one source association, independent of its position in a list.
+/// Keeping the allocation alive in a job prevents reuse after a source is removed.
+#[derive(Clone, Debug, Default)]
+pub struct SourceId(Arc<()>);
+
+impl SourceId {
+    pub fn matches(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 /// Something slow to go and do.
 pub enum Job {
     /// Resolve a source's name to addresses.
     Resolve {
-        index: usize,
+        source_id: SourceId,
         host: String,
         port: u16,
     },
@@ -41,9 +52,8 @@ pub enum Job {
     /// is only known once the first has finished, and splitting them
     /// would mean a round trip through the loop to learn nothing.
     Handshake {
-        index: usize,
+        source_id: SourceId,
         host: String,
-        canonical: String,
         ke_addresses: Vec<SocketAddr>,
         tls: Arc<ClientConfig>,
     },
@@ -54,11 +64,11 @@ pub enum Job {
 /// What came back.
 pub enum Done {
     Resolved {
-        index: usize,
+        source_id: SourceId,
         result: Result<Resolved, String>,
     },
     Handshook {
-        index: usize,
+        source_id: SourceId,
         /// The session, and the addresses to actually send NTP to.
         result: Result<(Box<Established>, Vec<SocketAddr>), String>,
     },
@@ -130,7 +140,11 @@ impl Worker {
 fn run(jobs: Receiver<Job>, done: Sender<Done>) {
     while let Ok(job) = jobs.recv() {
         let result = match job {
-            Job::Resolve { index, host, port } => {
+            Job::Resolve {
+                source_id,
+                host,
+                port,
+            } => {
                 let result = resolve::lookup(&host)
                     .map(|mut r| {
                         r.addresses.truncate(8);
@@ -138,17 +152,16 @@ fn run(jobs: Receiver<Job>, done: Sender<Done>) {
                         r
                     })
                     .map_err(|e| e.to_string());
-                Done::Resolved { index, result }
+                Done::Resolved { source_id, result }
             }
             Job::Handshake {
-                index,
+                source_id,
                 host,
-                canonical,
                 ke_addresses,
                 tls,
             } => Done::Handshook {
-                index,
-                result: handshake(&host, &canonical, &ke_addresses, &tls),
+                source_id,
+                result: handshake(&host, &ke_addresses, &tls),
             },
             Job::Roots => Done::Roots(trust::roots().and_then(nts_ke::tls_config)),
         };
@@ -161,13 +174,12 @@ fn run(jobs: Receiver<Job>, done: Sender<Done>) {
 /// Try each address in turn, then resolve whatever the server redirected to.
 fn handshake(
     host: &str,
-    canonical: &str,
     ke_addresses: &[SocketAddr],
     tls: &Arc<ClientConfig>,
 ) -> Result<(Box<Established>, Vec<SocketAddr>), String> {
     let mut last = None;
     for address in ke_addresses {
-        let established = match nts_ke::handshake(tls, canonical, *address) {
+        let established = match nts_ke::handshake(tls, host.trim_end_matches('.'), *address) {
             Ok(e) => e,
             Err(e) => {
                 last = Some(e.to_string());
@@ -205,8 +217,38 @@ fn handshake(
             last = Some("no usable NTP address".into());
             continue;
         }
-        let _ = host;
         return Ok((Box::new(established), addresses));
     }
     Err(last.unwrap_or_else(|| "no address to try".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+    use std::time::Duration;
+
+    #[test]
+    fn handshake_authenticates_the_configured_name_at_the_resolved_address() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut acceptor = rustls::server::Acceptor::default();
+            loop {
+                assert!(acceptor.read_tls(&mut stream).unwrap() > 0);
+                if let Some(hello) = acceptor.accept().unwrap() {
+                    return hello.client_hello().server_name().unwrap().to_owned();
+                }
+            }
+        });
+        let config = nts_ke::tls_config(Arc::new(rustls::RootCertStore::empty())).unwrap();
+        // DNS may return any address or canonical name. Neither is an identity
+        // input to the worker; rustls receives the configured DNS name.
+        assert!(handshake("configured.example.", &[address], &config).is_err());
+        assert_eq!(peer.join().unwrap(), "configured.example");
+    }
 }

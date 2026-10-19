@@ -31,34 +31,27 @@
 //! the time — and time is what certificate expiry, Kerberos tickets and log
 //! ordering all rest on.
 
-use libtimed::{
+use std::io;
+use peios::registry::{Key, KeyAccess, OpenFlags, RegValue, ValueType};
+#[path = "registry_reader.rs"]
+mod reader;
+use reader::{Reader, open, strings};
+use timed_core::{
     ALLOW_UNAUTHENTICATED_VALUE, AUTOMATIC_VALUE, CONTROL_SECURITY_VALUE, MAX_POLL_VALUE,
     MIN_POLL_VALUE, SERVERS_VALUE, TIME_KEY, TIME_ZONE_VALUE, USE_FROM_DHCP_VALUE,
 };
-use peios::registry::{Key, KeyAccess, OpenFlags, RegValue, ValueType};
 
 use crate::log;
 use crate::source::{DEFAULT_MAX_POLL, DEFAULT_MIN_POLL, POLL_CEILING, POLL_FLOOR};
 
 /// The compiled fallback, used when nothing else names a source.
 ///
-/// Four names under our own zone, CNAMEd to three independent operators in
-/// three jurisdictions: Cloudflare, Netnod (twice) and PTB. Three is the
-/// minimum at which one liar can be outvoted — see [`crate::select`] — and
-/// independence is what makes the votes worth counting: three servers run
-/// by one operator would agree with each other about anything.
-///
-/// The indirection through `time.peios.org` is deliberate. An operator that
-/// withdraws its service, or that we stop wanting to depend on, is a DNS
-/// change rather than an image rebuild.
-pub const FALLBACK_SERVERS: &[&str] = &[
-    "0.time.peios.org",
-    "1.time.peios.org",
-    "2.time.peios.org",
-    "3.time.peios.org",
-];
+/// Explicit NTS identities from three independent operators. DNS resolution
+/// supplies addresses only; changing an operator requires a policy or software
+/// update. See docs/development.md for the published endpoint references.
+pub const FALLBACK_SERVERS: &[&str] = &["time.cloudflare.com", "nts.netnod.se", "ptbtime1.ptb.de"];
 
-pub use libtimed::servers::{ServerSpec, parse_server};
+pub use timed_core::servers::{ServerSpec, parse_server};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -110,43 +103,18 @@ fn dword(v: &RegValue) -> Option<u32> {
         .then(|| u32::from_le_bytes([v.data[0], v.data[1], v.data[2], v.data[3]]))
 }
 
-fn multi(v: &RegValue) -> Option<Vec<String>> {
-    match v.ty {
-        ValueType::MULTI_SZ => Some(
-            v.data
-                .split(|&b| b == 0)
-                .filter(|s| !s.is_empty())
-                .filter_map(|s| String::from_utf8(s.to_vec()).ok())
-                .collect(),
-        ),
-        ValueType::SZ | ValueType::EXPAND_SZ => {
-            let end = v.data.iter().position(|&b| b == 0).unwrap_or(v.data.len());
-            String::from_utf8(v.data[..end].to_vec())
-                .ok()
-                .map(|s| vec![s])
-        }
-        _ => None,
-    }
+pub fn load() -> io::Result<Config> {
+    let root = open(None, TIME_KEY)?;
+    load_from(root.as_ref())
 }
 
-fn read(key: &Key, name: &str) -> Option<RegValue> {
-    key.query_value(name.as_bytes(), None).ok()
-}
-
-pub fn load() -> Config {
+fn load_from(root: Option<&impl Reader>) -> io::Result<Config> {
     let mut config = Config::default();
-    let Ok(root) = Key::open(
-        None,
-        TIME_KEY,
-        KeyAccess::QUERY_VALUE | KeyAccess::ENUMERATE_SUB_KEYS,
-        OpenFlags::empty(),
-    ) else {
-        // Before the seed applies there is no key, and the defaults are the
-        // right answer: the fallback set, NTS required, DHCP ignored.
-        return config;
+    let Some(root) = root else {
+        return Ok(config);
     };
 
-    if let Some(entries) = read(&root, SERVERS_VALUE).and_then(|v| multi(&v)) {
+    if let Some(entries) = strings(root, SERVERS_VALUE)? {
         for entry in entries {
             match parse_server(&entry) {
                 Ok(spec) => config.servers.push(spec),
@@ -155,16 +123,19 @@ pub fn load() -> Config {
         }
     }
 
-    if let Some(v) = read(&root, ALLOW_UNAUTHENTICATED_VALUE).and_then(|v| dword(&v)) {
+    if let Some(v) = root
+        .value(ALLOW_UNAUTHENTICATED_VALUE)?
+        .and_then(|v| dword(&v))
+    {
         config.allow_unauthenticated = v != 0;
     }
-    if let Some(v) = read(&root, USE_FROM_DHCP_VALUE).and_then(|v| dword(&v)) {
+    if let Some(v) = root.value(USE_FROM_DHCP_VALUE)?.and_then(|v| dword(&v)) {
         config.use_from_dhcp = v != 0;
     }
-    if let Some(v) = read(&root, MIN_POLL_VALUE).and_then(|v| dword(&v)) {
+    if let Some(v) = root.value(MIN_POLL_VALUE)?.and_then(|v| dword(&v)) {
         config.min_poll = (v as i64).clamp(POLL_FLOOR as i64, POLL_CEILING as i64) as i8;
     }
-    if let Some(v) = read(&root, MAX_POLL_VALUE).and_then(|v| dword(&v)) {
+    if let Some(v) = root.value(MAX_POLL_VALUE)?.and_then(|v| dword(&v)) {
         config.max_poll = (v as i64).clamp(POLL_FLOOR as i64, POLL_CEILING as i64) as i8;
     }
     if config.max_poll < config.min_poll {
@@ -175,20 +146,20 @@ pub fn load() -> Config {
         config.max_poll = config.min_poll;
     }
 
-    config.control_security = read(&root, CONTROL_SECURITY_VALUE)
+    config.control_security = root
+        .value(CONTROL_SECURITY_VALUE)?
         .filter(|v| v.ty == ValueType::BINARY && !v.data.is_empty())
         .map(|v| v.data);
 
-    if let Some(v) = read(&root, AUTOMATIC_VALUE).and_then(|v| dword(&v)) {
+    if let Some(v) = root.value(AUTOMATIC_VALUE)?.and_then(|v| dword(&v)) {
         config.automatic = v != 0;
     }
-    config.time_zone = read(&root, TIME_ZONE_VALUE)
-        .and_then(|v| multi(&v))
+    config.time_zone = strings(root, TIME_ZONE_VALUE)?
         .and_then(|v| v.into_iter().next())
         .map(|z| z.trim().to_string())
         .filter(|z| !z.is_empty());
 
-    config
+    Ok(config)
 }
 
 /// Arm a subtree watch on `Machine\System\Time`.
@@ -205,16 +176,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_fallback_is_four_names_under_our_own_zone() {
+    fn fallbacks_use_explicit_operator_identities() {
         let fallback = Config::fallback();
-        assert_eq!(fallback.len(), 4);
-        assert!(fallback.iter().all(|s| s.host.ends_with(".time.peios.org")));
+        assert_eq!(
+            fallback
+                .iter()
+                .map(|source| source.host.as_str())
+                .collect::<Vec<_>>(),
+            FALLBACK_SERVERS
+        );
         assert!(
             fallback.iter().all(|s| !s.unauthenticated),
             "the fallback is NTS"
         );
-        // Three independent operators is the point; four names is what
-        // gives the third a second site.
+        // Keep independent operators without letting DNS choose TLS identities.
         assert!(fallback.len() >= 3);
     }
 
@@ -229,5 +204,48 @@ mod tests {
         assert!(!c.has_explicit_servers());
         assert!(c.automatic, "the clock is kept from its sources");
         assert_eq!(c.time_zone, None, "UTC until somebody chooses");
+    }
+}
+
+#[cfg(test)]
+mod read_tests {
+    use super::*;
+    struct Fixture {
+        fault: &'static str,
+    }
+    impl Reader for Fixture {
+        fn value(&self, name: &str) -> io::Result<Option<peios::registry::RegValue>> {
+            if self.fault == "value" && name == "ControlSecurity" {
+                return Err(io::Error::from_raw_os_error(libc::EIO));
+            }
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn missing_configuration_keeps_documented_defaults() {
+        assert_eq!(load_from(None::<&Fixture>).unwrap(), Config::default());
+        assert_eq!(
+            load_from(Some(&Fixture { fault: "" })).unwrap(),
+            Config::default()
+        );
+    }
+    #[test]
+    fn failed_value_reads_do_not_produce_a_partial_configuration() {
+        let error = load_from(Some(&Fixture { fault: "value" })).unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(libc::EIO));
+    }
+    #[test]
+    fn malformed_text_cannot_silently_remove_one_list_entry() {
+        let value = peios::registry::RegValue {
+            sequence: 0,
+            ty: ValueType::MULTI_SZ,
+            data: b"valid\0\xff\0\0".to_vec(),
+            layer: vec![],
+        };
+        assert_eq!(
+            reader::multi(&value).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
     }
 }

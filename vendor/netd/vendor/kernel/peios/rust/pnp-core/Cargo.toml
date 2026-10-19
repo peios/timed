@@ -1,0 +1,16 @@
+[package]
+name = "pnp-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = []
+kernel = []
+
+[dependencies]
+peios-uapi = { path = "../peios-uapi", default-features = false }

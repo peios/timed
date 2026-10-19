@@ -18,14 +18,14 @@
 //!   not an NTS-KE server, whatever else it may be, and continuing would
 //!   mean interpreting some other protocol's bytes as records.
 //! - **The certificate, against the machine's trust store**, for the
-//!   *canonical* name. `1.time.peios.org` is a CNAME to `nts.netnod.se`
-//!   and it is Netnod's certificate that arrives, so validating against the
-//!   configured name would fail every time.
+//!   configured server name. DNS aliases select addresses, never a different
+//!   identity to trust (RFC 8915 section 3 and RFC 9525 section 6.1).
 
+use crate::deadline;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use ntp::nts::{self, ALPN, KeError, Keys, MAX_KE_MESSAGE, Negotiated, Record};
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
@@ -80,7 +80,7 @@ pub struct Established {
 /// Run the handshake against one address.
 ///
 /// `name` is what the certificate is validated against and must be the
-/// canonical name; `address` is where to connect, which may be any of the
+/// configured server name; `address` is where to connect, which may be any of the
 /// addresses that name resolved to.
 pub fn handshake(
     config: &Arc<ClientConfig>,
@@ -90,15 +90,14 @@ pub fn handshake(
     let server_name = ServerName::try_from(name.to_string())
         .map_err(|e| KeFailure::Tls(format!("{name} is not a valid server name: {e}")))?;
 
-    let mut socket = TcpStream::connect_timeout(&address, HANDSHAKE_TIMEOUT)
-        .map_err(|e| KeFailure::Connect(format!("connecting to {address}: {e}")))?;
-    socket
-        .set_read_timeout(Some(HANDSHAKE_TIMEOUT))
-        .map_err(|e| KeFailure::Connect(e.to_string()))?;
-    socket
-        .set_write_timeout(Some(HANDSHAKE_TIMEOUT))
-        .map_err(|e| KeFailure::Connect(e.to_string()))?;
+    let end = Instant::now() + HANDSHAKE_TIMEOUT;
+    let socket = TcpStream::connect_timeout(
+        &address,
+        deadline::remaining(end).map_err(|e| KeFailure::Connect(e.to_string()))?,
+    )
+    .map_err(|e| KeFailure::Connect(format!("connecting to {address}: {e}")))?;
     socket.set_nodelay(true).ok();
+    let mut socket = deadline::Stream::new(socket, end);
 
     let mut connection = ClientConnection::new(config.clone(), server_name)
         .map_err(|e| KeFailure::Tls(e.to_string()))?;
@@ -159,7 +158,7 @@ pub fn handshake(
 /// Read records until the message is complete.
 fn read_message(
     connection: &mut ClientConnection,
-    socket: &mut TcpStream,
+    socket: &mut deadline::Stream,
 ) -> Result<Vec<Record>, KeFailure> {
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 4096];

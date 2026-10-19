@@ -15,46 +15,25 @@
 //!   handful of TLS connections a day; holding a subscription open for that
 //!   would be a lot of machinery for very little.
 
-use std::os::unix::net::UnixStream;
 use std::sync::Arc;
+use std::time::Duration;
 
-use libtrust::{Reply, Request, SOCKET_PATH};
 use rustls::RootCertStore;
 use rustls_pki_types::CertificateDer;
+use trust_client::Client;
 
 use crate::log;
 
 /// Fetch the effective root set and build a rustls store from it.
 pub fn roots() -> Result<Arc<RootCertStore>, String> {
-    let mut stream = UnixStream::connect(SOCKET_PATH)
-        .map_err(|e| format!("cannot reach the trust store at {SOCKET_PATH}: {e}"))?;
-    stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
-        .map_err(|e| e.to_string())?;
+    let client = Client::system(Duration::from_secs(10)).map_err(|error| error.to_string())?;
+    roots_from(&client)
+}
 
-    libtrust::send(
-        &mut stream,
-        &Request::Roots {
-            with_der: true,
-            purpose: None,
-        }
-        .encode(),
-    )
-    .map_err(|e| format!("asking for roots: {e}"))?;
-
-    // The answer chunks; read until a reply says it is the last.
-    let mut replies = Vec::new();
-    loop {
-        let bytes = libtrust::recv(&mut stream).map_err(|e| format!("reading roots: {e}"))?;
-        let reply = Reply::decode(&bytes).map_err(|e| format!("malformed roots reply: {e}"))?;
-        let done = !matches!(&reply, Reply::Roots { more: true, .. });
-        replies.push(reply);
-        if done {
-            break;
-        }
-    }
-
-    let (_, roots) = libtrust::roots_of(replies)?;
+fn roots_from(client: &Client) -> Result<Arc<RootCertStore>, String> {
+    let roots = client
+        .roots(true, Some("ServerAuth"))
+        .map_err(|error| format!("reading TLS roots: {error}"))?;
     let mut store = RootCertStore::empty();
     let mut refused = 0usize;
     for root in &roots {
@@ -77,4 +56,56 @@ pub fn roots() -> Result<Arc<RootCertStore>, String> {
         return Err("the trust store yielded no usable roots".into());
     }
     Ok(Arc::new(store))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::net::UnixListener;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use trust_core::{Reply, Request};
+
+    #[test]
+    fn tls_roots_request_server_authentication_purpose() {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let directory = std::env::temp_dir().join(format!(
+            "timed-roots-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("socket");
+        let listener = UnixListener::bind(&path).unwrap();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let request = Request::decode(&trust_core::recv(&mut stream).unwrap()).unwrap();
+            assert_eq!(
+                request,
+                Request::Roots {
+                    with_der: true,
+                    purpose: Some("ServerAuth".into())
+                }
+            );
+            trust_core::send(
+                &mut stream,
+                &Reply::Roots {
+                    generation: 1,
+                    roots: vec![],
+                    more: false,
+                }
+                .encode(),
+            )
+            .unwrap();
+        });
+        let client = Client::new(&path, Duration::from_secs(2)).unwrap();
+        assert!(roots_from(&client).unwrap_err().contains("no usable roots"));
+        peer.join().unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

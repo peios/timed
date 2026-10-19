@@ -1,0 +1,16 @@
+[package]
+name = "libtrust"
+version = "0.1.6"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[lib]
+name = "trust_ffi"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+trust-core = { path = "../trust-core" }
+trust-abi = { path = "../trust-abi" }
+libc.workspace = true
+trust-client-core = { path = "../trust-client-core" }

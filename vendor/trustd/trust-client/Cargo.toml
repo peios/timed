@@ -1,0 +1,11 @@
+[package]
+name = "trust-client"
+version = "0.1.6"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+trust-core = { path = "../trust-core" }
+trust-abi = { path = "../trust-abi" }
+libc.workspace = true

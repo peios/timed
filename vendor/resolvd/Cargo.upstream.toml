@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = ["libresolvd", "resolvd-client", "resolvd-abi", "dns", "resolvd-core", "resolvd", "resolv", "nss", "vendor/netd/netd-core"]
+
+# resolvd is its own workspace root, like netd and authd.
+#
+#   dns        the DNS wire codec: names, messages, records. Pure — no I/O,
+#              no policy — and the most network-exposed code on the machine,
+#              so it is its own crate with its own tests and fuzz target.
+#   resolvd-core  the native wire on /run/resolv.sock: paths, rights, the
+#              request/reply codec. No I/O beyond framing.
+#   resolvd    the daemon: the stub resolver behind every door. Runs as
+#              LocalService under its own service SID.
+#   resolv     the operator command.
+#   nss        libnss_peios_net.so.2 — glibc's `hosts` database, forwarded
+#              to resolvd. Depends on resolvd-core and libc only.
+
+[workspace.package]
+version = "0.1.6"
+edition = "2024"
+rust-version = "1.98.1"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+libc = "0.2.189"
+# Keep this exact revision identical to netd-core's edge. Cargo rejects two
+# peios-sys packages which both declare links = "peios", and accepting a
+# mutable sibling here would also make the source lock incomplete.
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "26ac6968cec4cb7f887198aa3fb9268096660831", package = "peios" }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"

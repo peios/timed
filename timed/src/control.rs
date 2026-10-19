@@ -18,14 +18,14 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::time::Duration;
 
-use libtimed::{
-    Reply, Request, SOCKET_PATH, TIME_ALL_ACCESS, TIME_CONTROL, TIME_QUERY, TIMED_RUN_DIR,
-};
 use peios::access::AccessCheck;
 use peios::security::{
     AccessMask, AceFlags, AclBuilder, GenericMapping, SdBuilder, SecurityDescriptor, Sid, WellKnown,
 };
 use peios::token::Token;
+use timed_core::{
+    Reply, Request, SOCKET_PATH, TIME_ALL_ACCESS, TIME_CONTROL, TIME_QUERY, TIMED_RUN_DIR,
+};
 
 use crate::log;
 
@@ -98,7 +98,11 @@ pub fn protect(path: &Path) {
     );
     match &me {
         Ok(me) => {
-            acl.allow(me.as_ref(), AccessMask::GENERIC_ALL.bits(), AceFlags::empty());
+            acl.allow(
+                me.as_ref(),
+                AccessMask::GENERIC_ALL.bits(),
+                AceFlags::empty(),
+            );
         }
         Err(e) => log::warn(format_args!(
             "could not read timed's own identity ({e}); a restart may not be able to \
@@ -237,12 +241,12 @@ pub fn read_request(stream: &mut UnixStream) -> Result<Request, String> {
     stream
         .set_write_timeout(Some(WRITE_TIMEOUT))
         .map_err(|e| e.to_string())?;
-    let bytes = libtimed::recv(stream).map_err(|e| e.to_string())?;
+    let bytes = timed_core::recv(stream).map_err(|e| e.to_string())?;
     Request::decode(&bytes).map_err(|e| e.to_string())
 }
 
 pub fn write_reply(stream: &mut UnixStream, reply: &Reply) -> Result<(), String> {
-    libtimed::send(stream, &reply.encode()).map_err(|e| e.to_string())
+    timed_core::send(stream, &reply.encode()).map_err(|e| e.to_string())
 }
 
 /// Push to a subscriber without blocking on one that has stopped reading.

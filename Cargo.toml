@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["ntp", "libtimed", "timed", "clock"]
+members = ["libtimed", "timed-client", "timed-abi", "ntp", "timed-core", "timed", "clock", "vendor/netd/netd-core", "vendor/resolvd/resolvd-core", "vendor/resolvd/resolvd-abi", "vendor/resolvd/resolvd-client", "vendor/resolvd/libresolvd", "vendor/trustd/trust-core", "vendor/trustd/trust-abi", "vendor/trustd/trust-client", "vendor/trustd/trust-client-core", "vendor/trustd/libtrust"]
 
 # timed is its own workspace root, like netd, resolvd and trustd.
 #
@@ -8,7 +8,7 @@ members = ["ntp", "libtimed", "timed", "clock"]
 #             record format. Pure codec — no sockets, no clock, no policy.
 #             Everything hostile arrives through here, so it is the crate
 #             that gets fuzzed hardest.
-#   libtimed  the control wire: paths, rights, request/reply codec, the
+#   timed-core  the control wire: paths, rights, request/reply codec, the
 #             shapes `clock` and the future NTP server read.
 #   timed     the daemon. The one process on the machine permitted to set
 #             the clock.
@@ -39,4 +39,4 @@ incremental = false
 
 [workspace.dependencies]
 libc = "0.2"
-peios = { git = "https://github.com/peios/peios-rs.git", rev = "f8c84930f2b71763bcf0550df0b1420a0f63b21e", package = "peios" }
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "26ac6968cec4cb7f887198aa3fb9268096660831", package = "peios" }

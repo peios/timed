@@ -1,0 +1,11 @@
+[package]
+name = "timed-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+timed-core = { path = "../timed-core" }
+timed-abi = { path = "../timed-abi" }
+libc.workspace = true

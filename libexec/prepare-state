@@ -9,7 +9,7 @@
 #
 # Everything here is idempotent: the hook runs on every start, including
 # every restart, and must not care whether it has run before.
-exec > /var/state/timed-prepare.log 2>&1
+exec >/var/state/timed-prepare.log 2>&1
 set -x
 set -e
 
@@ -37,7 +37,7 @@ mkdir -p "$STATE/cookies"
 # everyone may read it, since every program reads /etc/localtime.
 LOCALTIME=/system/retc/localtime
 if [ -L "$LOCALTIME" ] || [ ! -f "$LOCALTIME" ]; then
-  rm -f "$LOCALTIME"
-  : > "$LOCALTIME"
+    rm -f "$LOCALTIME"
+    : >"$LOCALTIME"
 fi
 sd set "$LOCALTIME" "O:SYG:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;$TIMED_SID)(A;;GR;;;WD)"

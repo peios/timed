@@ -7,10 +7,12 @@
 //! friends, and a link to one of those would leave every program on the
 //! machine silently on UTC.
 
-use std::io::Read;
 use std::path::PathBuf;
 
-use crate::ZONEINFO_DIR;
+use crate::{ZONEINFO_DIR, files};
+
+/// Upper bound for one installed zone or metadata table.
+pub const MAX_ZONE_BYTES: usize = 16 * 1024 * 1024;
 
 /// The longest name in the database is 32 bytes
 /// (`America/Argentina/ComodRivadavia`); this leaves room without inviting
@@ -49,15 +51,18 @@ pub fn path(name: &str) -> PathBuf {
 /// Is `name` a zone this machine has? A well-formed name whose file begins
 /// with the TZif magic.
 pub fn installed(name: &str) -> Result<(), String> {
+    read(name).map(|_| ())
+}
+
+/// Read and validate the same opened zone file that the caller will use.
+pub fn read(name: &str) -> Result<Vec<u8>, String> {
     check_name(name)?;
-    let mut magic = [0u8; 4];
-    std::fs::File::open(path(name))
-        .and_then(|mut f| f.read_exact(&mut magic))
-        .map_err(|_| format!("there is no time zone {name:?} on this machine"))?;
-    if &magic != b"TZif" {
+    let bytes = files::read(&path(name), MAX_ZONE_BYTES)
+        .map_err(|error| format!("cannot read the time zone {name:?}: {error}"))?;
+    if !bytes.starts_with(b"TZif") {
         return Err(format!("{name:?} is not a time zone"));
     }
-    Ok(())
+    Ok(bytes)
 }
 
 /// One zone from `zone1970.tab`, the list the database keeps of the zones
@@ -76,8 +81,11 @@ pub struct Listed {
 
 /// Read the list, sorted by name. Empty when tzdata is not installed.
 pub fn list() -> Vec<Listed> {
-    let text = std::fs::read_to_string(PathBuf::from(ZONEINFO_DIR).join("zone1970.tab"))
-        .unwrap_or_default();
+    let text = files::read_text(
+        &PathBuf::from(ZONEINFO_DIR).join("zone1970.tab"),
+        MAX_ZONE_BYTES,
+    )
+    .unwrap_or_default();
     let mut zones = parse_tab(&text);
     zones.sort_by(|a, b| a.name.cmp(&b.name));
     zones
@@ -85,8 +93,11 @@ pub fn list() -> Vec<Listed> {
 
 /// Country names by ISO code, from `iso3166.tab`.
 pub fn countries() -> Vec<(String, String)> {
-    let text = std::fs::read_to_string(PathBuf::from(ZONEINFO_DIR).join("iso3166.tab"))
-        .unwrap_or_default();
+    let text = files::read_text(
+        &PathBuf::from(ZONEINFO_DIR).join("iso3166.tab"),
+        MAX_ZONE_BYTES,
+    )
+    .unwrap_or_default();
     text.lines()
         .filter(|l| !l.starts_with('#'))
         .filter_map(|l| {
@@ -162,4 +173,11 @@ mod tests {
         assert_eq!(zones[0].comment, None);
         assert_eq!(zones[1].comment.as_deref(), Some("Mountain (most areas)"));
     }
+}
+
+/// An ISO 3166 code and its display name from the installed time-zone database.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Country {
+    pub code: String,
+    pub name: String,
 }

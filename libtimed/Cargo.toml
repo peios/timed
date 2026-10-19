@@ -1,10 +1,15 @@
 [package]
 name = "libtimed"
-description = "timed's control wire: paths, rights, and the request/reply codec."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "timed_ffi"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
-peios = { workspace = true }
+timed-core = { path = "../timed-core" }
+timed-abi = { path = "../timed-abi" }
+libc.workspace = true
