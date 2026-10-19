@@ -1,0 +1,20 @@
+{
+    "package": {
+        "name": "dev.peios.libtimed-debuginfo",
+        "version": "0.1.10-1",
+        "architecture": "x86_64",
+        "license_class": "free",
+        "description": "Debug symbols for libtimed",
+        "homepage": "https://github.com/peios/timed"
+    },
+    "license_component": "libtimed",
+    "dependencies": {
+        "dev.peios.libtimed": "= 0.1.10-1"
+    },
+    "files": {
+        "source:LICENSE": "usr/share/licenses/dev.peios.libtimed-debuginfo/LICENSE",
+        "stage:licenses/libtimed/**": "usr/share/licenses/dev.peios.libtimed-debuginfo/third-party",
+        "stage:debug/libtimed/usr/lib/debug/**": "usr/lib/debug"
+    },
+    "executables": []
+}

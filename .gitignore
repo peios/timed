@@ -6,3 +6,10 @@
 /fuzz-*.log
 /fuzz/campaign.txt
 Cargo.lock.orig
+
+/bazel-*
+/.bazel-vendor
+/.build
+.trail-cache/
+__pycache__/
+*.pyc

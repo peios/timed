@@ -1,0 +1,182 @@
+load("//packages:package.bzl", "package_store")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+    "MODULE.bazel",
+])
+
+filegroup(
+    name = "rust-data",
+    srcs = [
+        "Cargo.lock",
+        "Cargo.toml",
+        "//clock:Cargo.toml",
+        "//clock:sources",
+        "//libtimed:Cargo.toml",
+        "//libtimed:sources",
+        "//ntp:Cargo.toml",
+        "//ntp:sources",
+        "//timed:Cargo.toml",
+        "//timed:sources",
+        "//timed-abi:Cargo.toml",
+        "//timed-abi:sources",
+        "//timed-client:Cargo.toml",
+        "//timed-client:sources",
+        "//timed-core:Cargo.toml",
+        "//timed-core:sources",
+        "//vendor/netd/netd-core:Cargo.toml",
+        "//vendor/netd/netd-core:sources",
+        "//vendor/resolvd/libresolvd:Cargo.toml",
+        "//vendor/resolvd/libresolvd:sources",
+        "//vendor/resolvd/resolvd-abi:Cargo.toml",
+        "//vendor/resolvd/resolvd-abi:sources",
+        "//vendor/resolvd/resolvd-client:Cargo.toml",
+        "//vendor/resolvd/resolvd-client:sources",
+        "//vendor/resolvd/resolvd-core:Cargo.toml",
+        "//vendor/resolvd/resolvd-core:sources",
+        "//vendor/trustd/libtrust:Cargo.toml",
+        "//vendor/trustd/libtrust:sources",
+        "//vendor/trustd/trust-abi:Cargo.toml",
+        "//vendor/trustd/trust-abi:sources",
+        "//vendor/trustd/trust-client:Cargo.toml",
+        "//vendor/trustd/trust-client:sources",
+        "//vendor/trustd/trust-client-core:Cargo.toml",
+        "//vendor/trustd/trust-client-core:sources",
+        "//vendor/trustd/trust-core:Cargo.toml",
+        "//vendor/trustd/trust-core:sources",
+    ],
+)
+
+filegroup(
+    name = "artifacts",
+    srcs = [
+        "//clock",
+        "//libtimed:shared",
+        "//timed:timed-bin",
+    ],
+)
+
+filegroup(
+    name = "crate-data",
+    srcs = [
+        "Cargo.lock",
+        "Cargo.toml",
+        "LICENSE",
+    ] + ["//vendor/trustd/trust-core:sources"],
+)
+
+filegroup(
+    name = "package-data",
+    srcs = [
+        "Cargo.lock",
+        "Cargo.toml",
+        "LICENSE",
+        "//libtimed:headers",
+        "//packages:definitions",
+        "//packages:family.json",
+    ] + [
+        "//clock:Cargo.toml",
+        "//libtimed:Cargo.toml",
+        "//ntp:Cargo.toml",
+        "//timed:Cargo.toml",
+        "//timed-abi:Cargo.toml",
+        "//timed-client:Cargo.toml",
+        "//timed-core:Cargo.toml",
+        "//vendor/netd/netd-core:Cargo.toml",
+        "//vendor/resolvd/libresolvd:Cargo.toml",
+        "//vendor/resolvd/resolvd-abi:Cargo.toml",
+        "//vendor/resolvd/resolvd-client:Cargo.toml",
+        "//vendor/resolvd/resolvd-core:Cargo.toml",
+        "//vendor/trustd/libtrust:Cargo.toml",
+        "//vendor/trustd/trust-abi:Cargo.toml",
+        "//vendor/trustd/trust-client:Cargo.toml",
+        "//vendor/trustd/trust-client-core:Cargo.toml",
+        "//vendor/trustd/trust-core:Cargo.toml",
+    ] + glob(
+        [
+            "docs/*.regman",
+            "docs/*.evman",
+            "docs/man/*",
+            "registry.d/*",
+            "libexec/*",
+            "etc/*",
+            "third-party/*",
+        ],
+        allow_empty = True,
+    ),
+)
+
+filegroup(
+    name = "package-sources",
+    srcs = glob(
+        [
+            "**",
+            ".github/**",
+            ".bazelrc",
+            ".bazelversion",
+            ".editorconfig",
+            ".gitignore",
+            ".gitattributes",
+        ],
+        allow_empty = True,
+        exclude = [
+            "**/__pycache__/**",
+            "**/*.pyc",
+            "**/target/**",
+            "target/**",
+            "bazel-*/**",
+            "**/.git/**",
+            ".ci-sdk/**",
+            "**/node_modules/**",
+            "**/.venv/**",
+            "**/.cache/**",
+            ".ci-sdk/**",
+            "**/node_modules/**",
+            "**/.venv/**",
+            "**/.cache/**",
+            "**/.trail-cache/**",
+            "docs/learn/dist/**",
+            "docs/archive/**",
+            "pekit.toml",
+            "lint.pekit.toml",
+            "packages.pekit/**",
+            "packaging/**",
+            "out/**",
+            "fuzz/corpus/**",
+            "fuzz/artifacts/**",
+            ".bazel-vendor/**",
+            ".build/**",
+            "fuzz/logs/**",
+            "fuzz/*.log",
+        ],
+    ) + [
+        "//build:package-files",
+        "//clock:package-files",
+        "//libtimed:package-files",
+        "//ntp:package-files",
+        "//packages:package-files",
+        "//timed:package-files",
+        "//timed-abi:package-files",
+        "//timed-client:package-files",
+        "//timed-core:package-files",
+        "//vendor/netd/netd-core:package-files",
+        "//vendor/ppk:package-files",
+        "//vendor/resolvd/libresolvd:package-files",
+        "//vendor/resolvd/resolvd-abi:package-files",
+        "//vendor/resolvd/resolvd-client:package-files",
+        "//vendor/resolvd/resolvd-core:package-files",
+        "//vendor/trustd/libtrust:package-files",
+        "//vendor/trustd/trust-abi:package-files",
+        "//vendor/trustd/trust-client:package-files",
+        "//vendor/trustd/trust-client-core:package-files",
+        "//vendor/trustd/trust-core:package-files",
+    ],
+)
+
+package_store(
+    name = "packages",
+    packages = ["//packages:all"],
+)

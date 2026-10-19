@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Check timed documentation and optionally its complete publication context."""
+
+from __future__ import annotations
+
+import argparse
+import difflib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+IGNORED = shutil.ignore_patterns(
+    "dist", ".trail-cache", ".git", "node_modules", "__pycache__", ".venv", ".cache"
+)
+
+
+def check_component(trail: str, output: Path) -> None:
+    source = ROOT / "docs/learn"
+    subprocess.run([trail, "lint", str(source)], check=True)
+    result = subprocess.run(
+        [
+            trail,
+            "build",
+            str(source),
+            "--strict",
+            "--allow-dangling-links",
+            "--no-cache",
+            "--out",
+            str(output),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    expected = json.loads((ROOT / "docs/external-links.json").read_text())
+    observed = sorted(line for line in result.stderr.splitlines() if line)
+    if observed != expected:
+        difference = "\n".join(
+            difflib.unified_diff(expected, observed, fromfile="expected", tofile="observed")
+        )
+        raise RuntimeError(f"Documentation diagnostic baseline changed:\n{difference}")
+    print(result.stdout, end="")
+    print(
+        f"Matched {len(expected)} external-link diagnostics; reviewed against the publication context."
+    )
+
+
+def copy_context(source: Path, destination: Path) -> None:
+    shutil.copytree(source, destination, ignore=IGNORED)
+    config_path = destination / "trail.toml"
+    config = config_path.read_text()
+    settings = tomllib.loads(config)
+    for merge in settings.get("merge", []):
+        original = merge["path"]
+        resolved = str((source / original).resolve())
+        config = config.replace(f'path = "{original}"', f'path = "{resolved}"')
+    config_path.write_text(config)
+
+
+def check_context(trail: str, source: Path, work: Path) -> None:
+    context = work / "context"
+    copy_context(source.resolve(), context)
+    subprocess.run(
+        [
+            trail,
+            "build",
+            str(context),
+            "--strict",
+            "--no-cache",
+            "--out",
+            str(work / "published"),
+        ],
+        check=True,
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--context", type=Path, help="Full Panorama documentation root")
+    args = parser.parse_args()
+    trail = os.environ.get("TRAIL", "trail")
+    with tempfile.TemporaryDirectory(prefix="timed-docs-") as temporary:
+        work = Path(temporary)
+        check_component(trail, work / "component")
+        if args.context is not None:
+            check_context(trail, args.context, work)
+        else:
+            print("Publication-context links require the separate --context check.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"check-docs: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

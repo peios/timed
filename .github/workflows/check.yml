@@ -1,0 +1,63 @@
+name: timed checks
+
+on:
+    pull_request:
+    push:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: timed-check-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    check:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  persist-credentials: false
+            - name: Install Linux development tools
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y build-essential libclang-dev pkg-config python3 python3-venv binutils nodejs npm
+                  rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+            - name: Select the shared JavaScript runtime
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+              with:
+                  node-version: "22.22.1"
+            - name: Prepare pinned PSC style tools
+              run: python3 tools/prepare-style-tools.py "$RUNNER_TEMP/timed-style"
+            - name: Check out the consolidated C SDK
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  repository: peios/peios-sdk
+                  ref: d56e86fbc922b83873006752600f8de7bc12cb84
+                  path: .ci-sdk/peios-sdk
+                  persist-credentials: false
+            - name: Prepare the development SDK
+              run: python3 tools/prepare-dev-sdk.py .ci-sdk/peios-sdk "$RUNNER_TEMP/peios-sdk"
+            - name: Check style, build, tests and packages
+              env:
+                  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+                  PEIOS_SDK: ${{ runner.temp }}/peios-sdk
+                  PEIOS_STYLE_BIN: ${{ runner.temp }}/timed-style/bin
+                  CARGO_TARGET_DIR: ${{ runner.temp }}/timed-cargo-checks
+              run: tools/check
+            - name: Check out the documentation compiler
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  repository: peios/trail
+                  ref: 1d662e98cbcbdd5c51c01533afcab7f5723a2eff
+                  path: .ci-sdk/trail
+                  persist-credentials: false
+            - name: Build the pinned documentation compiler
+              working-directory: .ci-sdk/trail
+              run: tools/bazel build //:trail
+            - name: Check documentation
+              env:
+                  TRAIL: ${{ github.workspace }}/.ci-sdk/trail/bazel-bin/trail
+              run: tools/check-docs

@@ -1,0 +1,19 @@
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+BreakBeforeBraces: Attach
+PointerAlignment: Right
+DerivePointerAlignment: false
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+InsertBraces: false
+RemoveBracesLLVM: false
+BreakStringLiterals: false
+# Includes may execute preprocessor actions; reorder only after semantic review.
+SortIncludes: Never
+ReflowComments: false

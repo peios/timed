@@ -1,0 +1,20 @@
+{
+    "name": "timed",
+    "client": "clock",
+    "api": "timed",
+    "library": "libtimed",
+    "version": "0.1.10",
+    "destinations": {
+        "timed": "usr/sbin/timed",
+        "clock": "usr/bin/clock",
+        "libtimed": "usr/lib/x86_64-linux-peios/libtimed.so.1"
+    },
+    "sonames": {
+        "libtimed": "libtimed.so.1"
+    },
+    "needed": {
+        "clock": ["libtimed.so.1"],
+        "timed": ["libpeios.so.0", "libtrust.so.1", "libresolvd.so.1"],
+        "libtimed": ["libpeios.so.0"]
+    }
+}

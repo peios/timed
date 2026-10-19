@@ -1,0 +1,22 @@
+{
+    "package": {
+        "name": "dev.peios.libtimed",
+        "version": "0.1.10-1",
+        "architecture": "x86_64",
+        "license_class": "free",
+        "description": "Shared client and configuration API for timed",
+        "homepage": "https://github.com/peios/timed"
+    },
+    "license_component": "libtimed",
+    "dependencies": {
+        "org.gnu.glibc": "*",
+        "org.gnu.gcc-libgcc": "*",
+        "dev.peios.libpeios": ">= 0.5.12-1"
+    },
+    "files": {
+        "source:LICENSE": "usr/share/licenses/dev.peios.libtimed/LICENSE",
+        "stage:licenses/libtimed/**": "usr/share/licenses/dev.peios.libtimed/third-party",
+        "stage:usr/lib/x86_64-linux-peios/libtimed.so.1": "usr/lib/x86_64-linux-peios/libtimed.so.1"
+    },
+    "executables": ["usr/lib/x86_64-linux-peios/libtimed.so.1"]
+}
