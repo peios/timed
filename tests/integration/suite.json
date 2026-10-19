@@ -1,0 +1,14 @@
+{
+    "format": 1,
+    "component": "timed",
+    "origin": {
+        "repository": "https://github.com/peios/integration-tests.git",
+        "commit": "a9aeaa2d6255bf59034ac5d90bee871a0d4829be"
+    },
+    "files": {
+        "tests/timed/clock-stepped.test.lua": "tests/timed/clock-stepped.test.lua"
+    },
+    "tests": [
+        "tests/timed/clock-stepped.test.lua"
+    ]
+}
