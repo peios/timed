@@ -32,7 +32,7 @@ tools/check
 ```
 
 Set `TRAIL` to the maintained Trail executable and run `tools/check-docs`.
-Use `tools/check-docs --context /path/to/panorama/docs` to check the complete
+Use `tools/check-docs --context /path/to/learn` to check the complete
 publication tree. A standalone component build checks an exact list of
 external-link diagnostics; it does not validate those external targets.
 
