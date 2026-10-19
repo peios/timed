@@ -1,0 +1,2 @@
+[allow]
+"elf.stripped" = "GNU strip deliberately retains rustc's small allocated .debug_gdb_scripts helper; removing that allocated section with binutils also removes the GNU_RELRO program header, while DWARF and symbols are detached into debuginfo"

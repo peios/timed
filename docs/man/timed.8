@@ -1,20 +1,20 @@
-.TH TIMED 8 "Peios" "timed 0.1.1" "System Administration"
+.TH TIMED 8 "Peios" "timed 0.1.10" "System Administration"
 .SH NAME
 timed \- Peios authenticated network time client
 .SH SYNOPSIS
 .B /usr/sbin/timed
 .SH DESCRIPTION
 .B timed
-keeps the system clock synchronised with configured network sources.  It is
+keeps the system clock synchronized with configured network sources.  It is
 the only service granted
 .B SeSystemtimePrivilege
 in the standard Peios image.  The daemon initiates NTP and Network Time
 Security connections but listens on no network port.
 .PP
-At startup it raises a clock older than the reproducible build timestamp to
-that timestamp.  This conservative floor permits certificate validation on a
-machine with an absent or failed real-time clock; it is not considered a
-successful time synchronisation.
+At startup it raises a clock older than the recorded build epoch to that
+lower bound. The epoch is stored in the source tree for reproducible builds.
+This bootstrap aid does not establish correct time or guarantee certificate
+validation.
 .PP
 Every time it steps the clock rather than adjusting its rate \(em at that
 startup floor, on its own decision, or when asked to by
@@ -29,6 +29,12 @@ Network Time Security is required by default.  Plain NTP is used only when an
 administrator explicitly enables it for a source.  Source selection requires
 agreement and rejects outliers rather than allowing a preferred source to
 override the majority.
+.PP
+NTS authenticates the configured hostname, not a DNS canonical name.
+The fallback sources are time.cloudflare.com, nts.netnod.se, and
+ptbtime1.ptb.de. Roots are obtained for ServerAuth at startup and refreshed
+after handshake failures; existing sessions and cached cookies are not
+immediately invalidated by a trust-store change.
 .SH CONFIGURATION
 The daemon watches
 .B Machine\\System\\Time
@@ -54,6 +60,10 @@ REG_DWORD base-two polling intervals, bounded by the daemon.
 Complete field semantics and security notes are installed as the
 .B timed.regman
 registry manual.
+.PP
+A failed complete configuration read retains the previous running
+configuration. An explicit reload reports this failure. Startup fails if
+the initial configuration cannot be read.
 .SH FILES
 .TP
 .B /run/timed/time.sock
@@ -91,8 +101,19 @@ as SYSTEM only to provision the protected state directory, and
 .B /etc/localtime
 in the registry-rendered layer of
 .BR /etc ,
-which only timed may write.
+which the service and authorized administrators can write.
 .SH SEE ALSO
 .BR clock (1),
 .BR reg (1),
 .BR svctl (1)
+
+.SH STATE FILE VALIDATION
+Installed zone files and zone metadata must be regular files no larger than
+16 MiB. Symlinks to regular files are allowed for zone aliases. State reads
+are bounded by their formats; malformed, oversized, or nonregular cache
+files are ignored. Saved state uses exclusively created private staging
+files, then rename, without reusing a pre-existing staging path.
+.PP
+The pre-created /etc/localtime file is updated in place because timed cannot
+rename entries in its parent. Readers can observe an empty or partial file
+during copying; a write failure can leave a partial copy.

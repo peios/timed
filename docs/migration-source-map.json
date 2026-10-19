@@ -1,0 +1,62 @@
+{
+    "source_root": "learn-staging",
+    "entries": [
+        {
+            "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/100--overview.md",
+            "sha256": "e9e1dd172fa56dee2bfc0148adbd8b837b6a0b5f74a0f346495035163177533c",
+            "destination": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/100--overview.md",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/100--overview.md",
+            "destination_sha256": "7263cb1b8a9fdc62808502dea5ac6dc6b1c82d6eb2ca9990813780ac1711e796"
+        },
+        {
+            "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/200--configuring-sources.md",
+            "sha256": "5b8ba3b8f70cf6155935c5d93d73f57a2be7296e8dfd0b85ab5986f7d1106763",
+            "destination": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/200--configuring-sources.md",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/200--configuring-sources.md",
+            "destination_sha256": "78ee9685846128193fbbf08749e1d3e0b54a1cf1dea7e7a952309c0e1debf089"
+        },
+        {
+            "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/250--time-zone-and-setting-the-clock.md",
+            "sha256": "97216499f41894815d167ecd97de5f56ade7993e4e2fff4f63452004b6ade5c2",
+            "destination": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/250--time-zone-and-setting-the-clock.md",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/250--time-zone-and-setting-the-clock.md",
+            "destination_sha256": "82b9d140bbc79f36cad9dea6d6d3dc5782c48259261661d3c30cb872b319d603"
+        },
+        {
+            "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/300--the-clock-command.md",
+            "sha256": "60e065b25b5040d8a0ff27d7937f864a3842a74f29c4ece51c5a8c6d3d089812",
+            "destination": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/300--the-clock-command.md",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/300--the-clock-command.md",
+            "destination_sha256": "feee7a2652f8833f178b22c8598e476b76281eb68d3cdf1b3f6300b24255ac4f"
+        },
+        {
+            "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/trail.toml",
+            "sha256": "1f142e8ef8f1db5701c6be63454d563123266dacc458b356a0316d0a8ac3cc5f",
+            "destination": "peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/trail.toml",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/100--fundamentals.shelf/600--time.topic/trail.toml",
+            "destination_sha256": "1f142e8ef8f1db5701c6be63454d563123266dacc458b356a0316d0a8ac3cc5f"
+        },
+        {
+            "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/13--timed/1--timed-clock-stepped.md",
+            "sha256": "24378d770e711b35b9c866d01e16d2b96475491757cf34ee31ec94e8cd1d0cfd",
+            "destination": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/13--timed/1--timed-clock-stepped.md",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/13--timed/1--timed-clock-stepped.md",
+            "destination_sha256": "1149ca0255dc7aea8846ca515a3ba6364d2c9fdd0933e45fd3562e20ff9a7aa3"
+        },
+        {
+            "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/13--timed/trail.toml",
+            "sha256": "be8adef69d419223fbeb1cde03902c6b9d1279a73fa6a690297daa2e7235d460",
+            "destination": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/13--timed/trail.toml",
+            "status": "reviewed, rewritten, linted, and verified in the Panorama publication context",
+            "original_archive": "docs/archive/learn-staging/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/13--timed/trail.toml",
+            "destination_sha256": "be8adef69d419223fbeb1cde03902c6b9d1279a73fa6a690297daa2e7235d460"
+        }
+    ],
+    "cross_component_material": "Retained in learn-staging; only the explicitly listed component-owned files moved."
+}

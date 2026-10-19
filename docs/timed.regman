@@ -1,0 +1,174 @@
+--- machine\system\time
+canonical: Machine\System\Time
+
+Timed reads this subtree to select time sources, choose the time zone, and
+control automatic synchronization. Registry permissions govern policy changes;
+the control socket has separate query and control rights.
+
+A failed complete registry read retains the last running configuration.
+Explicit reload reports the failure; startup fails if the initial read cannot
+complete. Malformed individual settings retain their documented fallback or
+warning behavior. Changing the source list restarts measurement.
+
+For manual time, set Automatic to 0 before using clock set. Direct clock changes
+while automatic synchronization is active can be corrected or rejected by the
+daemon's jump checks. The service's RequiredPrivileges grant is documented
+below.
+
+--- machine\system\time servers
+canonical: Machine\System\Time Servers
+type: REG_MULTI_SZ
+default: (absent; select eligible DHCP sources or built-in fallbacks)
+applies: live
+
+The explicit source list has highest precedence. Each entry contains a host,
+an optional port, and optional words:
+
+    time.example.org
+    time.example.org:4460
+    dc01.corp.example prefer
+    ntp.lan unauthenticated
+
+`prefer` breaks selection ties; it does not bypass agreement checks.
+`unauthenticated`, also spelled `noauth`, selects plain NTP and requires
+AllowUnauthenticated. Unknown options invalidate that entry with a warning.
+
+The first available list is selected: valid explicit entries, eligible DHCP
+sources, then the built-in fallbacks. Lists are not merged. Authentication
+filtering happens after selection; excluding every source in the selected
+list does not select the next list.
+
+Fallbacks are time.cloudflare.com, nts.netnod.se, and ptbtime1.ptb.de. TLS
+certificates are checked against the configured name, not a name returned by
+DNS. Replacing an operator requires configuration or a software update.
+
+Use several independent sources when disagreement detection is needed. One
+source provides no independent comparison; two disagreeing sources cannot
+establish which is correct.
+
+--- machine\system\time allowunauthenticated
+canonical: Machine\System\Time AllowUnauthenticated
+type: REG_DWORD
+default: 0
+applies: live
+
+Controls whether plain-NTP sources can be used.
+
+- `0`: require NTS authentication.
+- `1`: permit sources explicitly selected as unauthenticated, including
+  eligible DHCP sources.
+
+NTS establishes keys over authenticated TLS and authenticates time packets.
+Plain NTP checks the echoed request value but cannot authenticate a server
+against an observer able to see and alter the exchange.
+
+Failed key exchange can leave the machine unsynchronized. The recorded build
+epoch is a bootstrap lower bound, not verified current time, and cannot
+guarantee that TLS certificate validation will succeed.
+
+--- machine\system\time usefromdhcp
+canonical: Machine\System\Time UseFromDHCP
+type: REG_DWORD
+default: 0
+applies: live
+
+Controls use of DHCP option 42 from netd's snapshot when no valid explicit
+source list exists. Zero ignores those sources. One selects eligible DHCP
+sources as plain NTP; AllowUnauthenticated must also permit them.
+
+Enable this only when the DHCP configuration and network path are suitable
+sources of time policy. A configured DHCP address is not an authenticated
+server identity.
+
+--- machine\system\time minpoll
+canonical: Machine\System\Time MinPoll
+type: REG_DWORD
+default: 6
+applies: live
+
+The shortest interval between polls of one source, expressed as a power of
+two seconds. For example, 6 means 64 seconds and 10 means 1,024 seconds.
+The daemon clamps the exponent to 4 through 17. Lower values increase server
+traffic and the frequency of measurements.
+
+--- machine\system\time maxpoll
+canonical: Machine\System\Time MaxPoll
+type: REG_DWORD
+default: 10
+applies: live
+
+The longest polling interval, expressed as a power of two seconds. The daemon
+clamps the exponent to 4 through 17 and raises it to MinPoll if needed.
+Polling adapts between the configured bounds as synchronization develops.
+
+--- machine\system\time controlsecurity
+canonical: Machine\System\Time ControlSecurity
+type: REG_BINARY
+default: (absent — the compiled default is used)
+applies: live
+
+The self-relative security descriptor for /run/timed/time.sock.
+The rights are 0x1 for query and 0x2 for control. The compiled default grants
+SYSTEM and Administrators both rights and Everyone query access.
+
+Reload and manual set require control. Registry policy writes are governed
+by the registry key's descriptor, independently of this value.
+
+--- machine\system\time automatic
+canonical: Machine\System\Time Automatic
+type: REG_DWORD
+default: 1
+applies: live
+
+One enables polling and automatic clock discipline. Manual clock-setting
+requests are refused in this mode.
+
+Zero stops polling and permits clock set through the daemon's control right.
+The last learned frequency correction remains active. Status reports manual
+operation and remains unsynchronized because sources are not being checked.
+
+Re-enabling automatic operation starts measurement again and permits an
+initial clock step when sources establish a usable time.
+
+--- machine\system\time timezone
+canonical: Machine\System\Time TimeZone
+type: REG_SZ
+default: (absent — UTC)
+valid: a zone name from the tzdata package, such as `Europe/London` or `America/New_York`
+applies: live
+
+The system time zone, named from the installed tzdata database. Timed copies
+the zone file to the pre-created /etc/localtime at startup and when the chosen
+zone changes. Files and metadata must be regular files of at most 16 MiB;
+symlinks to regular files are supported. The copy is updated in place, so
+readers can see an empty or partial copy while a write is in progress.
+
+An absent value selects UTC. Invalid or unavailable names are rejected and
+retried after registry changes or ten minutes. Timed records the last applied
+name and trusts that record after restart only if its file matches localtime.
+An unknown zone is displayed as UTC; that fallback is not proof that the
+localtime file contains UTC data.
+
+Programs decide when to reload local-time data. Existing processes are not
+guaranteed to change their display immediately. Protocol timestamps remain
+UTC; the zone controls local presentation.
+
+--- machine\generic\authn\policy\s-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 privileges
+canonical: Machine\Generic\Authn\Policy\S-1-5-80-2061758774-2413367500-3090050229-3167896262-4120155161 Privileges
+type: REG_MULTI_SZ
+default: SeSystemtimePrivilege, SeChangeNotifyPrivilege, SeAuditPrivilege
+valid: privilege names; see the generic page for the vocabulary
+applies: next start
+
+This entry grants privileges to timed's service SID. It does not grant them
+to every service running under LocalService. The SID is derived from the
+service name TIMED and is also carried on timed's service token.
+
+SeSystemtimePrivilege permits clock adjustment. SeChangeNotifyPrivilege
+permits traversal needed to reach service files after peinit restricts the
+token to RequiredPrivileges. SeAuditPrivilege permits timed.clock.stepped
+events; failed event writes produce warnings without undoing a clock step.
+
+Removing the clock privilege prevents adjustment even if the daemon can
+measure offsets. Disable automatic synchronization or the service when a
+separate system is responsible for steering the clock.

@@ -1,0 +1,22 @@
+.TH LIBTIMED 3 "" "0.1.10" "Peios Library Functions"
+.SH NAME
+libtimed \- timed client and configuration API
+.SH SYNOPSIS
+.nf
+#include <peios/timed.h>
+.fi
+.SH DESCRIPTION
+The library exposes ABI 1 through libtimed.so.1.
+The installed header defines the complete API, result views, and ownership rules.
+Inputs are borrowed for a call. Results own their views until freed.
+Copy views before releasing their result.
+Mutable subscription handles require exclusive access.
+.SH ERRORS
+Result errors are POSIX error numbers. Diagnostic text is intended for people.
+A positive timeout in milliseconds covers connection, sending, and receiving.
+Operations are not replayed after uncertain I/O failures.
+.SH LINKING
+Use pkg-config with the timed module.
+The safe Rust wrapper is the timed-client crate.
+.SH SEE ALSO
+clock(1), timed(8)

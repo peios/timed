@@ -1,0 +1,8 @@
+[
+    "trail: warning: /peios/using-peios/events/timed/timed-clock-stepped: link '~peios/reading-records/stored-records' matches no page in product 'peios'",
+    "trail: warning: /peios/using-peios/time/configuring-sources: link '~peios/netd/what-netd-publishes/the-resolver-channel' matches no page in product 'peios'",
+    "trail: warning: /peios/using-peios/time/configuring-sources: related link: link '~peios/using-peios/peiosutils/registry-tools/regman' matches no page in product 'peios'",
+    "trail: warning: /peios/using-peios/time/overview: link '~peios/trust/overview' matches no page in product 'peios'",
+    "trail: warning: /peios/using-peios/time/overview: related link: link '~peios/trust/overview' matches no page in product 'peios'",
+    "trail: warning: /peios/using-peios/time/time-zone-and-setting-the-clock: link '~peios/desktop-settings/wallpaper-clock-and-dock' matches no page in product 'peios'"
+]
