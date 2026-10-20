@@ -112,7 +112,7 @@ Changing the clock outside timed leaves the service measuring an unexpected
 error. It can correct the change or refuse a sufficiently large offset.
 Using `clock set` coordinates the change with the service and emits
 `timed.clock.stepped` with operation `manual` and the requesting identity.
-See the [event reference](~peios/events/timed/timed-clock-stepped).
+Read the installed definition with `evman timed.clock.stepped`.
 
 Individual programs can display UTC with `date -u` or use a `TZ` environment
 setting where supported. Those choices do not change the machine clock.

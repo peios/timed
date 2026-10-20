@@ -99,7 +99,7 @@ correction. A reload is not a guarantee of uninterrupted wall-clock time.
 
 Each step emits `timed.clock.stepped`. Its `operation.name` distinguishes
 `automatic`, `manual`, and `boot-floor`. See the
-[clock-step reference](~peios/events/timed/timed-clock-stepped) and the
+installed `evman timed.clock.stepped` definition and the
 `timed.clock.stepped` evman entry for the recorded fields. Slewing does not
 emit a step event.
 

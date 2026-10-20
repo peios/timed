@@ -6,7 +6,7 @@ The public client library is `libtimed.so.1`, with the safe Rust wrapper
 
 - [Build and validate](docs/building.md).
 - [Package layout and provenance](docs/packaging.md).
-- [User and developer documentation](docs/learn/peios.product).
+- [User and developer documentation](docs/learn/1--peios.shelf/peios.product).
 - [Command and library manuals](docs/man).
 
 Use Bazel as the supported build and packaging interface. Development builds
