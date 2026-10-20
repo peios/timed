@@ -6,7 +6,7 @@ related:
   - peios/time/configuring-sources
   - peios/time/time-zone-and-setting-the-clock
   - peios/time/the-clock-command
-  - peios/trust/overview
+  - peios/certificate-trust/overview
 ---
 
 timed keeps the machine clock aligned with network time sources. Certificate
@@ -38,7 +38,7 @@ Security (TLS) exchange on port 4460 establishes keys for authenticated
 Network Time Protocol (NTP) messages.
 
 timed checks the certificate against the **configured server name**, using
-roots supplied by [trustd](~peios/trust/overview) for server authentication.
+roots supplied by [trustd](~peios/certificate-trust/overview) for server authentication.
 A DNS alias can change the address used for the connection; it cannot choose
 a different trusted certificate identity.
 
