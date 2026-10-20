@@ -1,5 +1,4 @@
 [
-  "trail: warning: /peios/reference/events/timed/timed-clock-stepped: link '~peios/reading-records/stored-records' matches no page in product 'peios'",
   "trail: warning: /peios/using-peios/time/configuring-sources: link '~peios/netd/what-netd-publishes/the-resolver-channel' matches no page in product 'peios'",
   "trail: warning: /peios/using-peios/time/configuring-sources: related link: link '~peios/using-peios/registry/regman' matches no page in product 'peios'",
   "trail: warning: /peios/using-peios/time/overview: link '~peios/certificate-trust/overview' matches no page in product 'peios'",
