@@ -1,3 +1,0 @@
-title = "Peios Events Index"
-short = "Events"
-description = "Every event Peios emits, in one place — the KMES envelope, the field groups events share, a page per event type generated from the evman catalog, a field index, and the registry's watch records, which are not events."

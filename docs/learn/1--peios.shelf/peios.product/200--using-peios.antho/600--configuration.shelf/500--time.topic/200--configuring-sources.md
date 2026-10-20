@@ -5,7 +5,7 @@ description: Choose time sources and check that timed can use them.
 related:
   - peios/time/overview
   - peios/time/the-clock-command
-  - peios/using-peios/peiosutils/registry-tools/regman
+  - peios/using-peios/registry-tools/regman
 ---
 
 Configure time sources when the machine needs a particular operator or a
