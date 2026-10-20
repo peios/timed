@@ -105,7 +105,7 @@ timed refuses manual setting while `Automatic` is `1`.
    authentication, agreement, accuracy, and fresh updates.
 
 <!-- Preserve the published heading anchor. -->
-<!-- lint-disable-next-line words -->
+<!-- lint-disable-next-line spelling -->
 ## Coordinating changes with timed {#why-not-just-set-the-clock}
 
 Changing the clock outside timed leaves the service measuring an unexpected
