@@ -11,8 +11,9 @@ use std::time::Duration;
 use timed_abi as abi;
 
 pub use timed_core::{
-    Auth, Origin, SOCKET_PATH, Snapshot, SourceInfo, SourceState, Status, Sync, TIME_ALL_ACCESS,
-    TIME_CONTROL, TIME_KEY, TIME_QUERY,
+    ALLOW_UNAUTHENTICATED_VALUE, AUTOMATIC_VALUE, Auth, MAX_POLL_VALUE, MIN_POLL_VALUE, Origin,
+    SERVERS_VALUE, SOCKET_PATH, Snapshot, SourceInfo, SourceState, Status, Sync, TIME_ALL_ACCESS,
+    TIME_CONTROL, TIME_KEY, TIME_QUERY, TIME_ZONE_VALUE, USE_FROM_DHCP_VALUE,
 };
 
 mod decode;

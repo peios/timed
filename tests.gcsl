@@ -35,7 +35,7 @@ let LIBRARIES = [{key = "LD_LIBRARY_PATH"; value = LIBRARY_PATH}]
 def loaded() -> List<{at: String, place: Dir | File}> {
     = [
         ...peios_rs.runtime(),
-        {at = "{LIBTIMED}/libtimed.so.1"; place = build libtimed()},
+        ...runtime(),
         {at = "{LIBRESOLVD}/libresolvd.so.1"; place = build libresolvd()},
         {at = "{LIBTRUST}/libtrust.so.1"; place = build libtrust()},
     ]

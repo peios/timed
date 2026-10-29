@@ -113,6 +113,24 @@ build whose `Cargo.lock` takes peios-rs's crates at another commit than
 built with always agree. The other Peios daemons take the same peios-rs
 commit.
 
+## Building against timed
+
+timed is a GCSL library as well as a workspace. A workspace whose crates
+depend on `timed-client` gives it libtimed, which it links, and gives its
+programs libtimed, and the libpeios it loads, when they run:
+
+```text
+import "github.com/peios/peios-rs" as peios_rs
+import "github.com/peios/timed"
+
+rust.workspace(..., crates = [...peios_rs.crate_settings(), ...timed.crate_settings()])
+rust.run_test(test, given = [...peios_rs.runtime(), ...timed.runtime()], env = timed.runtime_env())
+```
+
+`pekit lock` pins timed's commit in the workspace's `pekit.lock`. The rust
+library fails a build whose `Cargo.lock` takes timed's crates at another
+commit than that, so the crate and the libtimed it links always agree.
+
 ## Not built with pekit yet
 
 Packages and builds with the native Peios toolchain, which hardens
