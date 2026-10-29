@@ -1,0 +1,36 @@
+name: timed style
+
+# Checks owned source style only. Builds and tests run with pekit on the
+# build server and with `tools/check` locally, not here.
+on:
+    pull_request:
+    push:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: timed-check-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    style:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  persist-credentials: false
+            - name: Install the Rust formatter
+              run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+            - name: Select the shared JavaScript runtime
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+              with:
+                  node-version: "22.22.1"
+            - name: Prepare pinned PSC style tools
+              run: python3 tools/prepare-style-tools.py "$RUNNER_TEMP/timed-style"
+            - name: Check style
+              env:
+                  PEIOS_STYLE_BIN: ${{ runner.temp }}/timed-style/bin
+              run: python3 tools/style-check.py

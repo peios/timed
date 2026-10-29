@@ -4,12 +4,12 @@
     "archive_sha256": "23136b6b49c5c5cdb7185d1282b4881246c0189baa160e324acacb5cb8d5823a",
     "changes": [
         "Workspace restricted to netd-core and its kernel policy dependency.",
-        "peios-rs dependency aligned to the maintained SDK commit 26ac6968cec4cb7f887198aa3fb9268096660831. No source changes."
+        "peios-rs dependency aligned to the maintained SDK commit b2282f654758831e4a2e34c7b35c26e61a6ebe1c. No source changes.",
+        "netd-core/BUILD.bazel removed with the move to pekit."
     ],
     "sha256": {
         "Cargo.upstream.toml": "daa94ed9e71a9c9073a66a7076c9d822787962470e209024ddffe2eda6edc77c",
         "LICENSE": "772430941b962e36ab9cfbd33bc1dee6d47cae5e7ad5f4443b08610ed30f7ae6",
-        "netd-core/BUILD.bazel": "45946def799152706732de24c9d3efce26d945693b68b1738293cb57a814c10b",
         "netd-core/Cargo.toml": "3045cee2f1efc45aa6aa527786add1504ef333eed12c30056ad28e9a4b4250a7",
         "netd-core/src/hostname.rs": "5aab14246ddac80bbd78bbfbe00611718329b7f613f981cfd8337fe8e128cc08",
         "netd-core/src/lib.rs": "93b4565595f2a41ce1b3ece20282dbacdadbf54d207767b78f3a1813d8969567",

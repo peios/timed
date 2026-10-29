@@ -1,0 +1,86 @@
+# timed's programs and its C client library, each crate compiled on its own
+# (see the rust library's `workspace`), for glibc. timed links the client
+# libraries of resolvd and trustd, which are built from the crates timed
+# vendors.
+import "github.com/gcslib/clang"
+import "github.com/gcslib/rust"
+import "github.com/peios/peios-rs" as peios_rs
+
+# Where each client crate's build script is told its library is.
+let LIBTIMED = "/opt/timed/lib"
+
+let LIBRESOLVD = "/opt/resolvd/lib"
+
+let LIBTRUST = "/opt/trust/lib"
+
+# The timed workspace, planned. Each client crate links its C client
+# library, so it, and everything that depends on it, is given the library.
+def crates() -> rust.RustWorkspace {
+    = planned([
+        {
+            package = "timed-client"
+            env = [{key = "PEIOS_TIMED_LIB_DIR"; value = LIBTIMED}]
+            given = [{at = "{LIBTIMED}/libtimed.so"; place = build libtimed()}]
+        },
+        {
+            package = "resolvd-client"
+            env = [{key = "PEIOS_RESOLVD_LIB_DIR"; value = LIBRESOLVD}]
+            given = [{at = "{LIBRESOLVD}/libresolvd.so"; place = build libresolvd()}]
+        },
+        {
+            package = "trust-client"
+            data = [{at = "vendor/trustd/trust-core/tests/fixtures"; place = dir("vendor/trustd/trust-core/tests/fixtures")}]
+            env = [{key = "PEIOS_TRUST_LIB_DIR"; value = LIBTRUST}]
+            given = [{at = "{LIBTRUST}/libtrust.so"; place = build libtrust()}]
+        },
+    ])
+}
+
+# The workspace without the client crates' settings, which the C client
+# libraries are built from: none of them links another.
+def unlinked() -> rust.RustWorkspace {
+    = planned([])
+}
+
+# The timed workspace, planned, with `extra`, settings of further packages.
+# `peios-sys` binds libpeios with bindgen and links it, so it, and every
+# crate that depends on it, is given what peios-rs's library says it needs:
+# libpeios and its headers, built from the Peios SDK's own files. timed's
+# build script reads the release epoch in `build/epoch.txt`.
+fn planned(extra: List<rust.CrateSettings>) -> rust.RustWorkspace {
+    = rust.workspace(
+        dir("."),
+        rust.vendored(file("Cargo.lock")),
+        crates = [
+            ...peios_rs.crate_settings(),
+            {package = "timed"; data = [{at = "build/epoch.txt"; place = file("build/epoch.txt")}]},
+            ...extra,
+        ],
+        libclang = [clang.libclang_18()],
+    )
+}
+
+# The time daemon.
+def build timed() {
+    = rust.bin(crates(), "timed")
+}
+
+# The clock command, a client of timed's socket.
+def build clock() {
+    = rust.bin(crates(), "clock")
+}
+
+# The C client library, `libtimed.so.1` by its soname.
+def build libtimed() {
+    = rust.library(unlinked(), "libtimed")
+}
+
+# resolvd's C client library, `libresolvd.so.1`, from the vendored crates.
+def build libresolvd() {
+    = rust.library(unlinked(), "libresolvd")
+}
+
+# trustd's C client library, `libtrust.so.1`, from the vendored crates.
+def build libtrust() {
+    = rust.library(unlinked(), "libtrust")
+}

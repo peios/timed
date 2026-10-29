@@ -12,12 +12,5 @@
         "sha256": "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6",
         "member": "shellcheck-v0.11.0/shellcheck",
         "binary_sha256": "4da528ddb3a4d1b7b24a59d4e16eb2f5fd960f4bd9a3708a15baddbdf1d5a55b"
-    },
-    "buildifier": {
-        "version": "10.1.0",
-        "url": "https://github.com/bazel-contrib/buildtools/releases/download/v10.1.0/buildifier-linux-amd64",
-        "sha256": "31b6a8aa1e5c746696788f428729701770ad91925873d8256cb885c60e12c77e",
-        "member": null,
-        "binary_sha256": "31b6a8aa1e5c746696788f428729701770ad91925873d8256cb885c60e12c77e"
     }
 }

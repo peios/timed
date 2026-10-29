@@ -1,0 +1,249 @@
+# timed's tests: each member's unit and integration tests, as `cargo test
+# -p` builds them, the vendored crates' among them, the C ABI of timed's
+# client library and of the vendored resolvd and trustd ones, each owned
+# member's documentation tests, as `cargo test --doc` runs them, and
+# Clippy's checks, as `cargo clippy --all-targets -- -Dwarnings` makes them.
+#
+# A test's own code runs in a hermetic step of its own, so what it plans,
+# builds or fetches is in its parameters' defaults.
+import fs
+import toolchain
+import Toolchain from toolchain
+import "github.com/gcslib/rust"
+import "github.com/peios/peios-rs" as peios_rs
+
+# timed's own members, each a directory of the same name. The crates it
+# vendors are their components' to check.
+let MEMBERS = ["libtimed", "timed-client", "timed-abi", "ntp", "timed-core", "timed", "clock"]
+
+# Where the client libraries are placed, as `build.gcsl` places them for
+# the client crates.
+let LIBTIMED = "/opt/timed/lib"
+
+let LIBRESOLVD = "/opt/resolvd/lib"
+
+let LIBTRUST = "/opt/trust/lib"
+
+# Where the tests find the shared libraries they load.
+let LIBRARY_PATH = "/opt/peios/lib:{LIBTIMED}:{LIBRESOLVD}:{LIBTRUST}"
+
+let LIBRARIES = [{key = "LD_LIBRARY_PATH"; value = LIBRARY_PATH}]
+
+# What every test is given: libpeios, by its soname, which a program that
+# links it loads (see peios-rs's `runtime`), and the client libraries, by
+# their sonames, which the client crates load.
+def loaded() -> List<{at: String, place: Dir | File}> {
+    = [
+        ...peios_rs.runtime(),
+        {at = "{LIBTIMED}/libtimed.so.1"; place = build libtimed()},
+        {at = "{LIBRESOLVD}/libresolvd.so.1"; place = build libresolvd()},
+        {at = "{LIBTRUST}/libtrust.so.1"; place = build libtrust()},
+    ]
+}
+
+# Runs each of `tests`, given `given`.
+fn ran(tests: List<rust.RustTest>, given: List<{at: String, place: Dir | File}>) -> {} {
+    let each = for test in tests { = rust.run_test(test, given = given, env = LIBRARIES) }
+}
+
+def test libtimed(
+    tests: List<rust.RustTest> = rust.tests(crates(), "libtimed"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test timed_client(
+    tests: List<rust.RustTest> = rust.tests(crates(), "timed-client"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test timed_abi(
+    tests: List<rust.RustTest> = rust.tests(crates(), "timed-abi"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test ntp(
+    tests: List<rust.RustTest> = rust.tests(crates(), "ntp"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test timed_core(
+    tests: List<rust.RustTest> = rust.tests(crates(), "timed-core"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test timed(
+    tests: List<rust.RustTest> = rust.tests(crates(), "timed"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test clock(
+    tests: List<rust.RustTest> = rust.tests(crates(), "clock"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+# The vendored crates', as Bazel ran them.
+def test netd_core(
+    tests: List<rust.RustTest> = rust.tests(crates(), "netd-core"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test resolvd_core(
+    tests: List<rust.RustTest> = rust.tests(crates(), "resolvd-core"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test resolvd_abi(
+    tests: List<rust.RustTest> = rust.tests(crates(), "resolvd-abi"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test resolvd_client(
+    tests: List<rust.RustTest> = rust.tests(crates(), "resolvd-client"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test libresolvd(
+    tests: List<rust.RustTest> = rust.tests(crates(), "libresolvd"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test trust_core(
+    tests: List<rust.RustTest> = rust.tests(crates(), "trust-core"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test trust_abi(
+    tests: List<rust.RustTest> = rust.tests(crates(), "trust-abi"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test trust_client(
+    tests: List<rust.RustTest> = rust.tests(crates(), "trust-client"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test trust_client_core(
+    tests: List<rust.RustTest> = rust.tests(crates(), "trust-client-core"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+def test libtrust(
+    tests: List<rust.RustTest> = rust.tests(crates(), "libtrust"),
+    given: List<{at: String, place: Dir | File}> = loaded(),
+) {
+    = ran(tests, given)
+}
+
+# Each owned member's documentation tests.
+def test doctests(
+    ran: List<List<{}>> = for each in MEMBERS { = rust.doctests(crates(), each, given = loaded(), env = LIBRARIES) },
+) {}
+
+# Clippy's checks of each owned member, every warning denied.
+def test clippy(checked: List<List<{}>> = for each in MEMBERS { = rust.clippy(crates(), each, flags = ["-Dwarnings"]) }) {}
+
+# Builds the C program `source` against the public headers `include` and
+# the client library `library`, linked as `-l{name}` from `at`, and runs it
+# against the library by its soname, `lib{name}.so.1`.
+fn called(
+    library: File,
+    name: String,
+    at: String,
+    libpeios: List<{at: String, place: Dir | File}>,
+    include: Dir,
+    source: File,
+    c: toolchain.CToolchain,
+) -> {} {
+    let home = working_dir().path
+    let made = fs.mkdir("{home}/out")
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = c.runtime},
+        {at = "/opt/cc"; place = c.root},
+        {at = "/work/out"; place = dir("{home}/out")},
+        {at = "/work/include"; place = include},
+        {at = "/work/abi.c"; place = source},
+        {at = "{at}/lib{name}.so"; place = library},
+        {at = "{at}/lib{name}.so.1"; place = library},
+        ...(for each in libpeios { = {at = each.at; place = each.place} }),
+    ]
+    let box = fs.compose(placed).sandbox(cwd = "/work", env = {LD_LIBRARY_PATH = "/opt/peios/lib:{at}"})
+    let cc = c.cc.path.strip_prefix(c.root.path)
+    let compiled = box.exec(
+        "/opt/cc{cc}",
+        "-UNDEBUG",
+        "-I/work/include",
+        "/work/abi.c",
+        "-o",
+        "/work/out/abi",
+        "-L{at}",
+        "-Wl,-rpath-link,/opt/peios/lib",
+        "-l{name}",
+    )
+    let ran = box.exec("/work/out/abi")
+}
+
+# The C client's ABI: a C program that includes its public header and links
+# it calls it.
+def test abi(
+    library: File = build libtimed(),
+    libpeios: List<{at: String, place: Dir | File}> = peios_rs.runtime(),
+    include: Dir = dir("libtimed/include"),
+    source: File = file("libtimed/tests/abi.c"),
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+) {
+    = called(library, "timed", LIBTIMED, libpeios, include, source, c)
+}
+
+# The vendored resolvd client's ABI, as Bazel checked it.
+def test resolvd_c_abi(
+    library: File = build libresolvd(),
+    libpeios: List<{at: String, place: Dir | File}> = peios_rs.runtime(),
+    include: Dir = dir("vendor/resolvd/libresolvd/include"),
+    source: File = file("vendor/resolvd/libresolvd/tests/abi.c"),
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+) {
+    = called(library, "resolvd", LIBRESOLVD, libpeios, include, source, c)
+}
+
+# The vendored trustd client's ABI, as Bazel checked it.
+def test trust_c_abi(
+    library: File = build libtrust(),
+    libpeios: List<{at: String, place: Dir | File}> = peios_rs.runtime(),
+    include: Dir = dir("vendor/trustd/libtrust/include"),
+    source: File = file("vendor/trustd/libtrust/tests/abi.c"),
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+) {
+    = called(library, "trust", LIBTRUST, libpeios, include, source, c)
+}

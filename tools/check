@@ -1,0 +1,17 @@
+#!/bin/sh
+# The contributor check: owned source style and the generated interfaces,
+# then pekit's tests, which build every member, run its tests and
+# documentation tests, check the C client's ABI, and check every member
+# with Clippy.
+set -eu
+
+repo=$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo"
+# The generated interfaces are formatted with the pinned clang-format.
+if [ -n "${PEIOS_STYLE_BIN:-}" ]; then
+    PATH="$PEIOS_STYLE_BIN:$PATH"
+    export PATH
+fi
+python3 tools/style-check.py
+python3 tools/generate-api-types.py --check
+pekit test

@@ -1,5 +1,4 @@
 /target
-/out
 /fuzz/target/
 /fuzz/artifacts/
 /fuzz/corpus/
@@ -7,9 +6,12 @@
 /fuzz/campaign.txt
 Cargo.lock.orig
 
-/bazel-*
-/.bazel-vendor
-/.build
 .trail-cache/
 __pycache__/
 *.pyc
+
+# pekit build output.
+/pekit-out/
+
+# Libraries pekit fetches for the pins in `pekit.lock`.
+/.gcsl/
