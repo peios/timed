@@ -1,28 +1,17 @@
-#!/bin/bash
-# Validate maintained sources and declared development build/package outputs.
-set -euo pipefail
-cd "$(dirname "$0")/.."
-: "${PEIOS_SDK:?Set PEIOS_SDK to an explicit development SDK}"
+#!/bin/sh
+# The contributor check: owned source style and the generated interfaces,
+# then pekit's tests, which build every member, run its tests and
+# documentation tests, check the C client's ABI, and check every member
+# with Clippy.
+set -eu
+
+repo=$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo"
+# The generated interfaces are formatted with the pinned clang-format.
+if [ -n "${PEIOS_STYLE_BIN:-}" ]; then
+    PATH="$PEIOS_STYLE_BIN:$PATH"
+    export PATH
+fi
 python3 tools/style-check.py
 python3 tools/generate-api-types.py --check
-./bazel test //...
-./bazel build //:packages
-client_sdk=$(mktemp -d "${TMPDIR:-/tmp}/service-check-sdk.XXXXXXXX")
-trap 'rm -rf -- "$client_sdk"' EXIT HUP INT TERM
-cp bazel-bin/libtimed/libtimed_ffi.so "$client_sdk/libtimed.so.1"
-ln -s libtimed.so.1 "$client_sdk/libtimed.so"
-export PEIOS_TIMED_LIB_DIR="$client_sdk"
-cp bazel-bin/vendor/resolvd/libresolvd/libresolvd_ffi.so "$client_sdk/libresolvd.so.1"
-ln -s libresolvd.so.1 "$client_sdk/libresolvd.so"
-export PEIOS_RESOLVD_LIB_DIR="$client_sdk"
-cp bazel-bin/vendor/trustd/libtrust/libtrust_ffi.so "$client_sdk/libtrust.so.1"
-ln -s libtrust.so.1 "$client_sdk/libtrust.so"
-export PEIOS_TRUST_LIB_DIR="$client_sdk"
-export PEIOS_LIB_DIR="$PEIOS_SDK/lib"
-export PEIOS_INCLUDE="$PEIOS_SDK/include"
-export PKM_UAPI="$PEIOS_SDK/include"
-export LD_LIBRARY_PATH="$client_sdk:$PEIOS_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-compiler_include=$(cc -print-file-name=include)
-export BINDGEN_EXTRA_CLANG_ARGS="-isystem $compiler_include"
-cargo +1.98.1 clippy -p libtimed -p timed-client -p timed-abi -p ntp -p timed-core -p timed -p clock --all-targets --no-deps --locked -- -D warnings
-cargo +1.98.1 test -p libtimed -p timed-client -p timed-abi -p ntp -p timed-core -p timed -p clock --doc --locked
+pekit test

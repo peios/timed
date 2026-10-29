@@ -26,17 +26,13 @@ def run(args: list[str]) -> None:
 
 
 def main() -> None:
-    python = sorted(
-        str(p.relative_to(ROOT))
-        for root in ("tools", "packages")
-        for p in (ROOT / root).glob("*.py")
-    )
+    python = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "tools").glob("*.py"))
     if (ROOT / "tools/check-docs").exists():
         python.append("tools/check-docs")
     ruff = tool("ruff", "ruff 0.17.0")
     run([ruff, "check", "--no-cache", "--config", "tools/ruff.toml", *python])
     run([ruff, "format", "--check", "--no-cache", "--config", "tools/ruff.toml", *python])
-    shell = ["bazel", "tools/check", "tools/offline-build"] + sorted(
+    shell = ["tools/check"] + sorted(
         str(p.relative_to(ROOT))
         for directory in ("tests", "libexec")
         for p in (ROOT / directory).rglob("*")
@@ -46,30 +42,6 @@ def main() -> None:
     run([tool("shfmt", "v3.14.1"), "-d", "-i", "4", *shell])
     workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]
     roots = [name for name in workspace["members"] if not name.startswith("vendor/")]
-    starlark = [
-        str(p.relative_to(ROOT))
-        for p in ROOT.rglob("*")
-        if p.is_file()
-        and (p.name == "BUILD.bazel" or p.suffix == ".bzl")
-        and not {"target", ".git", ".ci-sdk"} & set(p.relative_to(ROOT).parts)
-    ]
-    starlark.append("MODULE.bazel")
-    directory = os.environ.get("PEIOS_STYLE_BIN")
-    buildifier = str(Path(directory) / "buildifier") if directory else "buildifier"
-    if "buildifier version: 10.1.0" not in [
-        line.strip()
-        for line in subprocess.check_output([buildifier, "--version"], text=True).splitlines()
-    ]:
-        raise SystemExit("buildifier must be version 10.1.0")
-    run(
-        [
-            buildifier,
-            "-mode=check",
-            "-lint=warn",
-            "-warnings=load,unused-variable,function-docstring",
-            *starlark,
-        ]
-    )
     clang_format = tool("clang-format", "clang-format version 18.1.8")
     headers = sorted(
         str(path.relative_to(ROOT))
@@ -79,8 +51,7 @@ def main() -> None:
     run([clang_format, "--dry-run", "--Werror", "--style=file:tools/clang-format.yaml", *headers])
     data = sorted(
         str(p.relative_to(ROOT))
-        for root in ("packages", ".github")
-        for p in (ROOT / root).rglob("*")
+        for p in (ROOT / ".github").rglob("*")
         if p.suffix in {".json", ".yml"}
     )
     if data:
@@ -102,7 +73,6 @@ def main() -> None:
             *sorted(
                 str(path.relative_to(ROOT)) for path in (ROOT / "fuzz/fuzz_targets").glob("*.rs")
             ),
-            "packages/check_blobs.rs",
         ]
     )
 
