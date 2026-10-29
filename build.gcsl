@@ -2,6 +2,14 @@
 # (see the rust library's `workspace`), for glibc. timed links the client
 # libraries of resolvd and trustd, which are built from the crates timed
 # vendors.
+#
+# timed is a library as well as a workspace: a workspace whose crates
+# depend on `timed-client` gives it libtimed, which it links, and gives its
+# programs libtimed when they run:
+#
+#     import "github.com/peios/timed"
+#     rust.workspace(..., crates = [...peios_rs.crate_settings(), ...timed.crate_settings()])
+#     rust.run_test(test, given = [...peios_rs.runtime(), ...timed.runtime()], env = timed.runtime_env())
 import "github.com/gcslib/clang"
 import "github.com/gcslib/rust"
 import "github.com/peios/peios-rs" as peios_rs
@@ -13,15 +21,36 @@ let LIBRESOLVD = "/opt/resolvd/lib"
 
 let LIBTRUST = "/opt/trust/lib"
 
-# The timed workspace, planned. Each client crate links its C client
-# library, so it, and everything that depends on it, is given the library.
-def crates() -> rust.RustWorkspace {
-    = planned([
+# The settings of `timed-client`: the C client library, libtimed, by its
+# link name, where its build script is told it is, for it and everything
+# that depends on it.
+def crate_settings() -> List<rust.CrateSettings> {
+    = [
         {
             package = "timed-client"
             env = [{key = "PEIOS_TIMED_LIB_DIR"; value = LIBTIMED}]
             given = [{at = "{LIBTIMED}/libtimed.so"; place = build libtimed()}]
         },
+    ]
+}
+
+# What a program that links libtimed loads: libtimed, by its soname, where
+# `timed-client` links it from.
+def runtime() -> List<{at: String, place: Dir | File}> {
+    = [{at = "{LIBTIMED}/libtimed.so.1"; place = build libtimed()}]
+}
+
+# Where such a program finds libtimed, and libpeios, which it loads (see
+# peios-rs's `runtime_env`).
+def runtime_env() -> List<Entry<String>> {
+    = [{key = "LD_LIBRARY_PATH"; value = "/opt/peios/lib:{LIBTIMED}"}]
+}
+
+# The timed workspace, planned. Each client crate links its C client
+# library, so it, and everything that depends on it, is given the library.
+def crates() -> rust.RustWorkspace {
+    = planned([
+        ...crate_settings(),
         {
             package = "resolvd-client"
             env = [{key = "PEIOS_RESOLVD_LIB_DIR"; value = LIBRESOLVD}]
